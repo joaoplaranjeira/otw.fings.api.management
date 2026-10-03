@@ -1,0 +1,86 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "docker-remove-fings",
+      "type": "shell",
+      "command": "docker rm -f otw.fings.api.management 2>/dev/null || true",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "docker-build-fings",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "build",
+        "--tag",
+        "otw.fings.api.management:debug",
+        "--file",
+        "${workspaceFolder}/Dockerfile",
+        "${workspaceFolder}"
+      ],
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "docker-run-fings",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--detach",
+        "--env-file",
+        "${workspaceFolder}/.env",
+        "--env",
+        "ASPNETCORE_ENVIRONMENT=Development",
+        "--env",
+        "Swagger__Enabled=true",
+        "--publish",
+        "5015:8080",
+        "--name",
+        "otw.fings.api.management",
+        "--entrypoint",
+        "sh",
+        "otw.fings.api.management:debug",
+        "-c",
+        "dotnet otw.fings.api.management.dll --migrate && exec dotnet otw.fings.api.management.dll"
+      ],
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "docker-remove-fings",
+        "docker-build-fings"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "docker-logs-fings",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "logs",
+        "--follow",
+        "otw.fings.api.management"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker-stop-fings",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "stop",
+        "otw.fings.api.management"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

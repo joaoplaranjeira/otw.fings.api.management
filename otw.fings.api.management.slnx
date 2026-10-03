@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="otw.fings.api.management.csproj" />
+  <Project Path="tests/otw.fings.api.management.Tests/otw.fings.api.management.Tests.csproj" />
+</Solution>

@@ -1,0 +1,12 @@
+.DS_Store
+.env
+.vs/
+.idea/
+bin/
+obj/
+**/bin/
+**/obj/
+*.user
+*.suo
+TestResults/
+coverage/
