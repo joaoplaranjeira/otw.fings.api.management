@@ -15,6 +15,7 @@ public sealed class ApiExceptionHandler(
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             ValidationException => (StatusCodes.Status422UnprocessableEntity, "Business validation failed"),
+            ReceiptImageQualityException => (StatusCodes.Status422UnprocessableEntity, "Receipt image quality insufficient"),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
@@ -32,6 +33,13 @@ public sealed class ApiExceptionHandler(
         }
 
         context.Response.StatusCode = status;
+        var extensions = exception is ReceiptImageQualityException qualityException
+            ? new Dictionary<string, object?>
+            {
+                ["code"] = "receipt_image_quality_insufficient",
+                ["imageQuality"] = qualityException.Quality
+            }
+            : null;
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = context,
@@ -39,7 +47,8 @@ public sealed class ApiExceptionHandler(
             {
                 Status = status,
                 Title = title,
-                Detail = status == 500 ? "Ocorreu um erro inesperado." : exception.Message
+                Detail = status == 500 ? "Ocorreu um erro inesperado." : exception.Message,
+                Extensions = extensions ?? new Dictionary<string, object?>()
             },
             Exception = exception
         });

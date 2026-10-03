@@ -7,6 +7,7 @@ Web API ASP.NET Core 10 para gestão financeira pessoal e familiar.
 - registo e autenticação passwordless por OTP;
 - JWT Bearer válido durante um mês de calendário a partir da emissão;
 - isolamento por agregado familiar;
+- gestão de membros e papéis por agregado familiar;
 - catálogo inicial de categorias e subcategorias criado automaticamente por agregado;
 - orçamentos mensais válidos num intervalo de meses;
 - criação automática de uma receita planeada por cada mês do orçamento;
@@ -51,7 +52,7 @@ Antes do primeiro deploy:
 
 O Heroku fornece a variável `PORT` em runtime; o container usa-a automaticamente e mantém a porta `8080` como valor por omissão para execução local.
 
-O contrato para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md).
+O contrato geral para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md), com a gestão de membros detalhada em [`docs/household-members-frontend.md`](docs/household-members-frontend.md).
 
 ## Semântica do orçamento
 

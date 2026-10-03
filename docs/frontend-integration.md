@@ -9,6 +9,7 @@ A primeira versão permite:
 - registar um utilizador e criar o seu primeiro agregado familiar;
 - autenticar por código OTP enviado por email;
 - gerir vários agregados por utilizador;
+- adicionar, listar e remover membros dos agregados familiares;
 - criar categorias e subcategorias de despesa;
 - definir um orçamento mensal aplicável durante um intervalo de meses;
 - distribuir parte ou todo o orçamento por categorias;
@@ -18,7 +19,7 @@ A primeira versão permite:
 - consultar o orçamento disponível e a execução por categoria num mês;
 - enviar a imagem de um talão para extração transitória através da OpenAI.
 
-Não estão ainda disponíveis edição, cancelamento ou eliminação de registos, convites para outros membros, receitas manuais, projeções históricas avançadas, exportações ou gamificação.
+Não estão ainda disponíveis edição, cancelamento ou eliminação de registos, convites por email para utilizadores não registados, receitas manuais, projeções históricas avançadas, exportações ou gamificação.
 
 ## 2. Ambientes e convenções
 
@@ -207,10 +208,12 @@ Papéis:
 
 | Valor | Papel | Acesso atual |
 |---:|---|---|
-| `1` | Owner | Leitura e escrita |
-| `2` | Administrator | Leitura e escrita |
-| `3` | Member | Leitura e escrita |
+| `1` | Owner | Leitura, escrita e gestão de todos os membros |
+| `2` | Administrator | Leitura, escrita e gestão de Member e Viewer |
+| `3` | Member | Leitura e escrita, sem gestão de membros |
 | `4` | Viewer | Apenas leitura |
+
+Os endpoints de gestão de membros, respetivas permissões, payloads e respostas estão documentados em [`household-members-frontend.md`](household-members-frontend.md).
 
 ## 6. Categorias e subcategorias
 
@@ -549,7 +552,7 @@ Depois de criar uma despesa, o frontend deve invalidar as queries de despesas e 
 
 ## 12. Parsing de talões
 
-`POST /api/households/{householdId}/receipts/parse`
+`POST /api/households/{householdId}/receipts/parse?acceptLowQuality=false`
 
 Pedido `multipart/form-data` com um único campo chamado `file`:
 
@@ -570,6 +573,31 @@ const response = await fetch(
 Não definir manualmente `Content-Type`; o browser acrescenta o boundary correto.
 
 São aceites JPEG, PNG e WebP até 10 MiB. A API valida o MIME e a assinatura binária. A imagem e o resultado não são guardados.
+
+Existe uma segunda leitura visual experimental, mas está desativada por omissão porque acrescenta latência e custo sem benefício consistente nos talões reais testados. Pode ser ativada pontualmente com `OpenAI__VerifyReceiptValues=true`.
+
+Antes dessa chamada, a API recorta localmente o papel e divide talões compridos em segmentos sobrepostos. Todos os segmentos são enviados em conjunto numa única extração, para manter a latência controlada e tornar a coluna de valores mais legível. Quando o papel não é detetado com segurança, a imagem original é usada sem alterações.
+
+A qualidade é avaliada localmente antes de qualquer chamada à OpenAI, através da resolução útil do talão, nitidez, exposição e capacidade de separar o papel do fundo. O limiar por omissão é `80/100` e pode ser configurado com `OpenAI__MinimumReceiptImageQuality`.
+
+Quando a qualidade fica abaixo do limiar e `acceptLowQuality` é `false`, a API não executa o parse e devolve `422`:
+
+```json
+{
+  "title": "Receipt image quality insufficient",
+  "status": 422,
+  "detail": "A qualidade da fotografia pode ser insuficiente para ler o talão com precisão. Submeta outra fotografia ou repita o pedido aceitando explicitamente o risco.",
+  "code": "receipt_image_quality_insufficient",
+  "imageQuality": {
+    "score": 64,
+    "level": "Aceitável",
+    "acceptedWithRisk": false,
+    "warnings": ["A fotografia pode estar desfocada ou com texto pouco nítido."]
+  }
+}
+```
+
+O frontend deve oferecer duas ações: selecionar outra fotografia ou repetir o mesmo pedido com `acceptLowQuality=true`. Neste último caso, o parse prossegue, `acceptedWithRisk` fica a `true` e a resposta inclui também um aviso geral.
 
 Resposta:
 
@@ -598,7 +626,13 @@ Resposta:
       "confidence": 0.94
     }
   ],
-  "warnings": []
+  "warnings": [],
+  "imageQuality": {
+    "score": 92,
+    "level": "Muito boa",
+    "acceptedWithRisk": false,
+    "warnings": []
+  }
 }
 ```
 
@@ -606,12 +640,13 @@ Quando a OpenAI não identifica uma categoria com segurança, a API devolve **N�
 
 Fluxo recomendado no frontend:
 
-1. Mostrar loading durante o parse.
-2. Apresentar todas as parcelas num ecrã de revisão editável.
-3. Destacar confiança baixa e `warnings`.
-4. Permitir corrigir descrição, valor e classificação.
-5. Criar **uma única despesa** através de `POST /expenses`, usando o `total` como `amount`, `origin: 3` e enviando todas as linhas revistas em `lines`.
-6. Considerar a operação concluída depois de esse movimento único ter sido criado.
+1. Mostrar loading durante a avaliação e o parse.
+2. Se receber `receipt_image_quality_insufficient`, mostrar a percentagem e os avisos, permitindo escolher outra fotografia ou continuar assumindo o risco.
+3. Apresentar todas as parcelas num ecrã de revisão editável.
+4. Destacar confiança baixa e `warnings`.
+5. Permitir corrigir descrição, valor e classificação.
+6. Criar **uma única despesa** através de `POST /expenses`, usando o `total` como `amount`, `origin: 3` e enviando todas as linhas revistas em `lines`.
+7. Considerar a operação concluída depois de esse movimento único ter sido criado.
 
 Exemplo do pedido de criação após a revisão:
 

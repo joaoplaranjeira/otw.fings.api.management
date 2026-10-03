@@ -34,6 +34,60 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(
+        Guid householdId,
+        CancellationToken cancellationToken) =>
+        await dbContext.HouseholdMembers.AsNoTracking()
+            .Where(x => x.HouseholdId == householdId)
+            .OrderBy(x => x.Role)
+            .ThenBy(x => x.User.Name)
+            .Select(x => new HouseholdMemberResponse(
+                x.Id,
+                x.UserId,
+                x.User.Name,
+                x.User.Username,
+                x.User.Email,
+                x.User.IsActive,
+                x.Role))
+            .ToListAsync(cancellationToken);
+
+    public Task<HouseholdMember?> GetHouseholdMemberAsync(
+        Guid householdId,
+        Guid memberId,
+        CancellationToken cancellationToken) =>
+        dbContext.HouseholdMembers
+            .Include(x => x.User)
+            .SingleOrDefaultAsync(x => x.HouseholdId == householdId && x.Id == memberId, cancellationToken);
+
+    public Task<bool> HasHouseholdMemberAsync(
+        Guid householdId,
+        long userId,
+        CancellationToken cancellationToken) =>
+        dbContext.HouseholdMembers.AnyAsync(
+            x => x.HouseholdId == householdId && x.UserId == userId,
+            cancellationToken);
+
+    public Task<User?> GetActiveUserByEmailAsync(string email, CancellationToken cancellationToken) =>
+        dbContext.Users.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Email == email && x.IsActive, cancellationToken);
+
+    public Task<int> CountHouseholdOwnersAsync(Guid householdId, CancellationToken cancellationToken) =>
+        dbContext.HouseholdMembers.CountAsync(
+            x => x.HouseholdId == householdId && x.Role == HouseholdRole.Owner,
+            cancellationToken);
+
+    public async Task AddHouseholdMemberAsync(HouseholdMember member, CancellationToken cancellationToken)
+    {
+        dbContext.HouseholdMembers.Add(member);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveHouseholdMemberAsync(HouseholdMember member, CancellationToken cancellationToken)
+    {
+        dbContext.HouseholdMembers.Remove(member);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Category>> GetCategoriesAsync(Guid householdId, CancellationToken cancellationToken) =>
         await dbContext.Categories.AsNoTracking().Include(x => x.Subcategories)
             .Where(x => x.HouseholdId == householdId && x.IsActive)

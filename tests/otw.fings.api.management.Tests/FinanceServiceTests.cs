@@ -46,6 +46,149 @@ public sealed class FinanceServiceTests
     }
 
     [Fact]
+    public async Task AddAndListHouseholdMember_AddsRegisteredActiveUser()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        db.Users.Add(CreateUser(2, "Maria", "maria", "maria@example.com"));
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var added = await service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new(" MARIA@example.com ", HouseholdRole.Member),
+            CancellationToken.None);
+        var members = await service.GetHouseholdMembersAsync(household.Id, 1, CancellationToken.None);
+
+        Assert.Equal(2, added.UserId);
+        Assert.Equal(HouseholdRole.Member, added.Role);
+        Assert.Equal(2, members.Count);
+        Assert.Contains(members, x => x.UserId == 2 && x.Email == "maria@example.com");
+    }
+
+    [Fact]
+    public async Task AddHouseholdMember_RejectsDuplicateAndUnknownUser()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<ConflictException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new("owner@example.com", HouseholdRole.Member),
+            CancellationToken.None));
+        await Assert.ThrowsAsync<NotFoundException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new("unknown@example.com", HouseholdRole.Member),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Administrator_CanManageMembersButNotPrivilegedRoles()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var administrator = CreateUser(2, "Admin", "admin", "admin@example.com");
+        var target = CreateUser(3, "Membro", "member", "member@example.com");
+        db.AddRange(
+            administrator,
+            target,
+            new HouseholdMember
+            {
+                HouseholdId = household.Id,
+                UserId = administrator.Id,
+                Role = HouseholdRole.Administrator
+            });
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var added = await service.AddHouseholdMemberAsync(
+            household.Id,
+            administrator.Id,
+            new(target.Email, HouseholdRole.Viewer),
+            CancellationToken.None);
+
+        Assert.Equal(HouseholdRole.Viewer, added.Role);
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            administrator.Id,
+            new("owner@example.com", HouseholdRole.Owner),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Member_CannotManageHouseholdMembers()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var member = CreateUser(2, "Membro", "member", "member@example.com");
+        var target = CreateUser(3, "Novo membro", "new-member", "new@example.com");
+        db.AddRange(
+            member,
+            target,
+            new HouseholdMember
+            {
+                HouseholdId = household.Id,
+                UserId = member.Id,
+                Role = HouseholdRole.Member
+            });
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            member.Id,
+            new(target.Email, HouseholdRole.Member),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RemoveHouseholdMember_RemovesMemberAndProtectsRequester()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var target = CreateUser(2, "Maria", "maria", "maria@example.com");
+        var targetMembership = new HouseholdMember
+        {
+            HouseholdId = household.Id,
+            UserId = target.Id,
+            Role = HouseholdRole.Member
+        };
+        db.AddRange(target, targetMembership);
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await service.RemoveHouseholdMemberAsync(
+            household.Id,
+            targetMembership.Id,
+            1,
+            CancellationToken.None);
+
+        Assert.False(await db.HouseholdMembers.AnyAsync(x => x.Id == targetMembership.Id));
+        var ownerMembership = await db.HouseholdMembers.SingleAsync(x => x.UserId == 1);
+        await Assert.ThrowsAsync<ValidationException>(() => service.RemoveHouseholdMemberAsync(
+            household.Id,
+            ownerMembership.Id,
+            1,
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HouseholdRoles_ReturnsAllSupportedRoles()
+    {
+        await using var db = CreateDbContext();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var roles = service.GetHouseholdRoles();
+
+        Assert.Equal(Enum.GetValues<HouseholdRole>(), roles.Select(x => x.Value));
+        Assert.Equal(["Owner", "Administrator", "Member", "Viewer"], roles.Select(x => x.Name));
+    }
+
+    [Fact]
     public async Task CreateBudget_GeneratesOnePlannedIncomeForEveryMonth()
     {
         await using var db = CreateDbContext();
@@ -555,4 +698,14 @@ public sealed class FinanceServiceTests
         await db.SaveChangesAsync();
         return (household, category);
     }
+
+    private static User CreateUser(long id, string name, string username, string email) => new()
+    {
+        Id = id,
+        Name = name,
+        Username = username,
+        Email = email,
+        InsertedDate = DateTime.UtcNow,
+        UpdatedDate = DateTime.UtcNow
+    };
 }

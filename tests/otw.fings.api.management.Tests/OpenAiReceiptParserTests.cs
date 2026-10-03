@@ -14,6 +14,8 @@ public sealed class OpenAiReceiptParserTests
         Assert.Contains("quantity e unitPrice como null", OpenAiReceiptParser.ExtractionInstructions);
         Assert.Contains("soma os amount", OpenAiReceiptParser.ExtractionInstructions);
         Assert.Contains("resumo de IVA", OpenAiReceiptParser.ExtractionInstructions);
+        Assert.Contains("amountText", OpenAiReceiptParser.ValueVerificationInstructions);
+        Assert.Contains("segunda leitura independente", OpenAiReceiptParser.ValueVerificationInstructions);
     }
 
     [Fact]
@@ -82,6 +84,59 @@ public sealed class OpenAiReceiptParserTests
             .GetProperty("classificationKey");
 
         Assert.Equal("null", classificationKey.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void CreateValueVerificationSchema_RequiresEveryValidLineIndex()
+    {
+        using var schema = JsonDocument.Parse(OpenAiReceiptParser.CreateValueVerificationSchema(3));
+        var indexes = schema.RootElement.GetProperty("properties")
+            .GetProperty("lines").GetProperty("items").GetProperty("properties")
+            .GetProperty("lineIndex").GetProperty("enum")
+            .EnumerateArray().Select(x => x.GetInt32()).ToArray();
+
+        Assert.Equal(new[] { 0, 1, 2 }, indexes);
+    }
+
+    [Fact]
+    public void ApplyVerifiedValues_UsesHighConfidenceCorrectionThatImprovesReconciliation()
+    {
+        var receipt = new OpenAiReceiptParser.ParsedReceipt(
+            "Loja", null, null, "2027-01-01", "EUR", null, null, 10m,
+            [
+                new("Produto A", 1, 6m, 6m),
+                new("Produto B", 1, 5m, 5m)
+            ],
+            []);
+        var verification = new OpenAiReceiptParser.VerifiedReceiptValues(
+            "10,00", 10m, 0.99m,
+            [
+                new(0, 1, 0.99m, "6,00", 6m, 0.99m, "6,00", 6m, 0.99m),
+                new(1, 1, 0.99m, "4,00", 4m, 0.99m, "4,00", 4m, 0.99m)
+            ]);
+
+        var result = OpenAiReceiptParser.ApplyVerifiedValues(receipt, verification);
+
+        Assert.Equal(new[] { 6m, 4m }, result.Lines.Select(x => x.Amount).ToArray());
+        Assert.Equal(10m, result.Total);
+        Assert.Contains(result.Warnings, x => x.Contains("segunda leitura", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ApplyVerifiedValues_KeepsFirstExtractionWhenReviewHasLowConfidence()
+    {
+        var receipt = new OpenAiReceiptParser.ParsedReceipt(
+            "Loja", null, null, "2027-01-01", "EUR", null, null, 10m,
+            [new("Produto", 1, 10m, 10m)],
+            []);
+        var verification = new OpenAiReceiptParser.VerifiedReceiptValues(
+            "10,00", 10m, 0.99m,
+            [new(0, 1, 0.5m, "8,00", 8m, 0.5m, "8,00", 8m, 0.5m)]);
+
+        var result = OpenAiReceiptParser.ApplyVerifiedValues(receipt, verification);
+
+        Assert.Same(receipt, result);
+        Assert.Equal(10m, result.Lines[0].Amount);
     }
 
     [Theory]

@@ -10,6 +10,13 @@ public interface IFinanceRepository
         HouseholdMember membership,
         IReadOnlyList<Category> categories,
         CancellationToken cancellationToken);
+    Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(Guid householdId, CancellationToken cancellationToken);
+    Task<HouseholdMember?> GetHouseholdMemberAsync(Guid householdId, Guid memberId, CancellationToken cancellationToken);
+    Task<bool> HasHouseholdMemberAsync(Guid householdId, long userId, CancellationToken cancellationToken);
+    Task<User?> GetActiveUserByEmailAsync(string email, CancellationToken cancellationToken);
+    Task<int> CountHouseholdOwnersAsync(Guid householdId, CancellationToken cancellationToken);
+    Task AddHouseholdMemberAsync(HouseholdMember member, CancellationToken cancellationToken);
+    Task RemoveHouseholdMemberAsync(HouseholdMember member, CancellationToken cancellationToken);
     Task<IReadOnlyList<Category>> GetCategoriesAsync(Guid householdId, CancellationToken cancellationToken);
     Task<Category?> GetCategoryAsync(Guid householdId, Guid categoryId, CancellationToken cancellationToken);
     Task<Subcategory?> GetSubcategoryAsync(Guid categoryId, Guid subcategoryId, CancellationToken cancellationToken);

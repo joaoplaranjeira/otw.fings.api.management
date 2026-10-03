@@ -19,7 +19,8 @@ public sealed class ReceiptsController(
     public async Task<ActionResult<ReceiptParseResponse>> Parse(
         Guid householdId,
         IFormFile file,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] bool acceptLowQuality = false)
     {
         await using var stream = file.OpenReadStream();
         return Ok(await parser.ParseAsync(
@@ -28,6 +29,7 @@ public sealed class ReceiptsController(
             stream,
             file.ContentType,
             file.Length,
+            acceptLowQuality,
             cancellationToken));
     }
 

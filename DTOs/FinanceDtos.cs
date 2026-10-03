@@ -9,6 +9,21 @@ public sealed record CreateHouseholdRequest(
     [StringLength(3, MinimumLength = 3)] string Currency = "EUR",
     [MaxLength(100)] string TimeZone = "Europe/Lisbon");
 
+public sealed record AddHouseholdMemberRequest(
+    [Required, EmailAddress, MaxLength(255)] string Email,
+    HouseholdRole Role);
+
+public sealed record HouseholdMemberResponse(
+    Guid Id,
+    long UserId,
+    string Name,
+    string Username,
+    string Email,
+    bool IsActive,
+    HouseholdRole Role);
+
+public sealed record HouseholdRoleResponse(HouseholdRole Value, string Name);
+
 public sealed record CategoryResponse(
     Guid Id,
     string Name,
@@ -190,6 +205,12 @@ public sealed record ReceiptLineParseResponse(
     string? SuggestedSubcategoryName,
     decimal Confidence);
 
+public sealed record ReceiptImageQualityResponse(
+    int Score,
+    string Level,
+    bool AcceptedWithRisk,
+    IReadOnlyList<string> Warnings);
+
 public sealed record ReceiptParseResponse(
     Guid ParseId,
     string? MerchantName,
@@ -202,7 +223,8 @@ public sealed record ReceiptParseResponse(
     decimal Total,
     decimal LinesTotal,
     IReadOnlyList<ReceiptLineParseResponse> Lines,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    ReceiptImageQualityResponse ImageQuality);
 
 public sealed record ValidateReceiptParseRequest(
     bool IsValid,

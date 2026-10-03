@@ -42,6 +42,22 @@ public sealed class OpenAiReceiptParser(
         - O resumo de IVA pode confirmar o total, mas as bases e os valores de IVA não são parcelas de compra.
         """;
 
+    internal const string ValueVerificationInstructions = """
+        Faz uma segunda leitura independente dos valores monetários de um talão português.
+        A extração anterior é apenas uma hipótese: confirma cada número diretamente na imagem e corrige-o quando necessário.
+
+        # Regras obrigatórias
+        - Mantém exatamente os mesmos lineIndex; não juntes, dividas, acrescentes nem removas parcelas.
+        - Para cada parcela, lê amount diretamente da coluna monetária impressa mais à direita na mesma linha.
+        - amountText deve transcrever literalmente o valor visível, incluindo vírgula decimal e sinal negativo.
+        - Nunca calcules amount a partir de quantity ou unitPrice e nunca alteres um valor para forçar a soma.
+        - Códigos de IVA como I1/I2/I3, referências, dosagens, percentagens e números de lote não são valores.
+        - Descontos impressos com sinal negativo devem continuar negativos.
+        - quantity e unitPrice ficam null quando não estiverem explicitamente impressos.
+        - Confiança significa certeza de leitura visual do número, não certeza aritmética.
+        - Confirma também o total pago diretamente na zona de totais e transcreve-o em totalText.
+        """;
+
     internal const string ClassificationInstructions = """
         És um especialista em classificação de despesas pessoais e familiares em Portugal.
         Receberás os dados já extraídos de um talão e uma lista fechada de opções. Para cada lineIndex devolve exatamente
@@ -132,12 +148,45 @@ public sealed class OpenAiReceiptParser(
     }
     """;
 
+    private const string ValueVerificationSchema = """
+    {
+      "type": "object",
+      "properties": {
+        "totalText": { "type": "string" },
+        "total": { "type": "number" },
+        "totalConfidence": { "type": "number" },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lineIndex": { "type": "integer" },
+              "quantity": { "type": ["number", "null"] },
+              "quantityConfidence": { "type": "number" },
+              "unitPriceText": { "type": ["string", "null"] },
+              "unitPrice": { "type": ["number", "null"] },
+              "unitPriceConfidence": { "type": "number" },
+              "amountText": { "type": "string" },
+              "amount": { "type": "number" },
+              "amountConfidence": { "type": "number" }
+            },
+            "required": ["lineIndex", "quantity", "quantityConfidence", "unitPriceText", "unitPrice", "unitPriceConfidence", "amountText", "amount", "amountConfidence"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["totalText", "total", "totalConfidence", "lines"],
+      "additionalProperties": false
+    }
+    """;
+
     public async Task<ReceiptParseResponse> ParseAsync(
         Guid householdId,
         long userId,
         Stream image,
         string contentType,
         long length,
+        bool acceptLowQuality,
         CancellationToken cancellationToken)
     {
         if (!await repository.IsMemberAsync(householdId, userId, cancellationToken))
@@ -163,6 +212,22 @@ public sealed class OpenAiReceiptParser(
         await image.CopyToAsync(memory, cancellationToken);
         var bytes = memory.ToArray();
         ValidateSignature(bytes, contentType);
+        var preparedImages = ReceiptImagePreprocessor.Prepare(bytes);
+        var preparedContentType = preparedImages.WasCropped ? "image/jpeg" : contentType;
+        logger.LogInformation(
+            "Receipt image preparation: cropped={WasCropped}, bounds={Bounds}, segments={SegmentCount}, quality={QualityScore}.",
+            preparedImages.WasCropped,
+            preparedImages.Bounds,
+            preparedImages.Images.Count,
+            preparedImages.Quality.Score);
+        var imageQuality = MapImageQuality(
+            preparedImages.Quality,
+            configuration.MinimumReceiptImageQuality,
+            acceptLowQuality);
+        if (preparedImages.Quality.Score < configuration.MinimumReceiptImageQuality && !acceptLowQuality)
+        {
+            throw new ReceiptImageQualityException(imageQuality);
+        }
 
         var categories = await repository.GetCategoriesAsync(householdId, cancellationToken);
         var classificationOptions = CreateClassificationOptions(categories);
@@ -172,11 +237,28 @@ public sealed class OpenAiReceiptParser(
         ChatClient extractionClient = new(extractionModel, configuration.ApiKey);
         ChatClient classificationClient = new(configuration.Model, configuration.ApiKey);
 
-        var parsed = await ExtractAsync(extractionClient, bytes, contentType, cancellationToken);
+        var parsed = await ExtractAsync(extractionClient, preparedImages.Images, preparedContentType, cancellationToken);
+        if (configuration.VerifyReceiptValues && parsed.Lines.Count > 0)
+        {
+            var verifiedValues = await VerifyValuesAsync(
+                extractionClient,
+                preparedImages.Images,
+                preparedContentType,
+                parsed,
+                cancellationToken);
+            if (verifiedValues is not null)
+            {
+                parsed = ApplyVerifiedValues(parsed, verifiedValues);
+            }
+        }
         IReadOnlyList<ParsedClassification> classifications = parsed.Lines.Count == 0
             ? []
             : await ClassifyAsync(classificationClient, parsed, classificationOptions, cancellationToken);
         var warnings = parsed.Warnings.ToList();
+        if (imageQuality.AcceptedWithRisk)
+        {
+            warnings.Add("O parse foi efetuado apesar de a qualidade da fotografia poder ser insuficiente.");
+        }
         var classificationsByLine = classifications
             .Where(x => x.LineIndex >= 0 && x.LineIndex < parsed.Lines.Count)
             .GroupBy(x => x.LineIndex)
@@ -242,20 +324,35 @@ public sealed class OpenAiReceiptParser(
             parsed.Total,
             lineTotal,
             lines,
-            warnings.Distinct().ToArray());
+            warnings.Distinct().ToArray(),
+            imageQuality);
     }
+
+    private static ReceiptImageQualityResponse MapImageQuality(
+        ReceiptImagePreprocessor.ImageQualityAssessment quality,
+        int minimumQuality,
+        bool acceptedWithRisk) => new(
+            quality.Score,
+            quality.Score >= minimumQuality ? "Muito boa" : quality.Score >= 60 ? "Aceitável" : "Insuficiente",
+            quality.Score < minimumQuality && acceptedWithRisk,
+            quality.Warnings);
 
     private async Task<ParsedReceipt> ExtractAsync(
         ChatClient client,
-        byte[] bytes,
+        IReadOnlyList<byte[]> images,
         string contentType,
         CancellationToken cancellationToken)
     {
         SystemChatMessage instructions = new(ExtractionInstructions);
-        UserChatMessage message = new([
-            ChatMessageContentPart.CreateTextPart("Extrai os dados deste talão."),
-            ChatMessageContentPart.CreateImagePart(BinaryData.FromBytes(bytes), contentType, ChatImageDetailLevel.High)
-        ]);
+        var content = new List<ChatMessageContentPart>
+        {
+            ChatMessageContentPart.CreateTextPart(images.Count == 1
+                ? "Extrai os dados deste talão."
+                : "As imagens são recortes sobrepostos do mesmo talão, ordenados de cima para baixo. Extrai cada parcela uma única vez e usa as zonas repetidas apenas para confirmar a leitura.")
+        };
+        content.AddRange(images.Select(image =>
+            ChatMessageContentPart.CreateImagePart(BinaryData.FromBytes(image), contentType, ChatImageDetailLevel.High)));
+        UserChatMessage message = new(content);
         ChatCompletionOptions options = new()
         {
             Temperature = 0,
@@ -285,6 +382,103 @@ public sealed class OpenAiReceiptParser(
             logger.LogError(exception, "OpenAI receipt extraction failed.");
             throw new IntegrationUnavailableException("Não foi possível extrair o talão.");
         }
+    }
+
+    private async Task<VerifiedReceiptValues?> VerifyValuesAsync(
+        ChatClient client,
+        IReadOnlyList<byte[]> images,
+        string contentType,
+        ParsedReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var previousExtraction = new
+        {
+            total = receipt.Total,
+            lines = receipt.Lines.Select((line, index) => new
+            {
+                lineIndex = index,
+                line.Description,
+                line.Quantity,
+                line.UnitPrice,
+                line.Amount
+            })
+        };
+        SystemChatMessage instructions = new(ValueVerificationInstructions);
+        var content = new List<ChatMessageContentPart>
+        {
+            ChatMessageContentPart.CreateTextPart(
+                "Revê os valores desta extração contra os recortes do talão, ordenados de cima para baixo:\n" +
+                JsonSerializer.Serialize(previousExtraction))
+        };
+        content.AddRange(images.Select(image =>
+            ChatMessageContentPart.CreateImagePart(BinaryData.FromBytes(image), contentType, ChatImageDetailLevel.High)));
+        UserChatMessage message = new(content);
+        ChatCompletionOptions options = new()
+        {
+            Temperature = 0,
+#pragma warning disable OPENAI001
+            Seed = 240931,
+#pragma warning restore OPENAI001
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                "receipt_value_verification",
+                BinaryData.FromString(CreateValueVerificationSchema(receipt.Lines.Count)),
+                jsonSchemaIsStrict: true)
+        };
+
+        try
+        {
+            ChatCompletion completion = await client.CompleteChatAsync([instructions, message], options, cancellationToken);
+            return JsonSerializer.Deserialize<VerifiedReceiptValues>(
+                completion.Content[0].Text,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "OpenAI receipt value verification failed; keeping the first extraction.");
+            return null;
+        }
+    }
+
+    internal static ParsedReceipt ApplyVerifiedValues(ParsedReceipt receipt, VerifiedReceiptValues verification)
+    {
+        if (verification.Total <= 0 || verification.Lines.Count != receipt.Lines.Count)
+        {
+            return receipt;
+        }
+        var linesByIndex = verification.Lines
+            .Where(x => x.LineIndex >= 0 && x.LineIndex < receipt.Lines.Count)
+            .GroupBy(x => x.LineIndex)
+            .ToDictionary(x => x.Key, x => x.ToArray());
+        if (linesByIndex.Count != receipt.Lines.Count || linesByIndex.Values.Any(x => x.Length != 1))
+        {
+            return receipt;
+        }
+
+        var candidateLines = receipt.Lines.Select((line, index) =>
+        {
+            var verified = linesByIndex[index][0];
+            return line with
+            {
+                Quantity = verified.QuantityConfidence >= 0.9m ? verified.Quantity : line.Quantity,
+                UnitPrice = verified.UnitPriceConfidence >= 0.9m ? verified.UnitPrice : line.UnitPrice,
+                Amount = verified.AmountConfidence >= 0.85m ? verified.Amount : line.Amount
+            };
+        }).ToArray();
+        var candidateTotal = verification.TotalConfidence >= 0.9m ? verification.Total : receipt.Total;
+        var originalDifference = Math.Abs(receipt.Lines.Sum(x => x.Amount) - receipt.Total);
+        var candidateDifference = Math.Abs(candidateLines.Sum(x => x.Amount) - candidateTotal);
+        var changed = candidateTotal != receipt.Total || candidateLines.Where((line, index) => line != receipt.Lines[index]).Any();
+        if (!changed || candidateDifference > originalDifference + 0.001m)
+        {
+            return receipt;
+        }
+
+        return receipt with
+        {
+            Total = candidateTotal,
+            Lines = candidateLines,
+            Warnings = receipt.Warnings.Append("Os valores monetários foram confirmados numa segunda leitura da imagem.").ToArray()
+        };
     }
 
     private async Task<IReadOnlyList<ParsedClassification>> ClassifyAsync(
@@ -407,6 +601,19 @@ public sealed class OpenAiReceiptParser(
         return schema.ToJsonString();
     }
 
+    internal static string CreateValueVerificationSchema(int lineCount)
+    {
+        var schema = JsonNode.Parse(ValueVerificationSchema)?.AsObject()
+            ?? throw new InvalidOperationException("O schema de verificação de valores não é válido.");
+        var lineIndexes = new JsonArray();
+        for (var index = 0; index < lineCount; index++)
+        {
+            lineIndexes.Add(index);
+        }
+        schema["properties"]!["lines"]!["items"]!["properties"]!["lineIndex"]!["enum"] = lineIndexes;
+        return schema.ToJsonString();
+    }
+
     internal static ClassificationOption? ApplyClassificationGuardrails(
         string? merchantName,
         string lineDescription,
@@ -514,7 +721,7 @@ public sealed class OpenAiReceiptParser(
 
     internal sealed record ClassificationOption(string Key, Category Category, Subcategory? Subcategory);
 
-    private sealed record ParsedReceipt(
+    internal sealed record ParsedReceipt(
         string? MerchantName,
         string? MerchantTaxNumber,
         string? DocumentNumber,
@@ -526,7 +733,7 @@ public sealed class OpenAiReceiptParser(
         IReadOnlyList<ParsedLine> Lines,
         IReadOnlyList<string> Warnings);
 
-    private sealed record ParsedLine(
+    internal sealed record ParsedLine(
         string Description,
         decimal? Quantity,
         decimal? UnitPrice,
@@ -535,4 +742,21 @@ public sealed class OpenAiReceiptParser(
     private sealed record ParsedClassifications(IReadOnlyList<ParsedClassification> Classifications);
 
     private sealed record ParsedClassification(int LineIndex, string? ClassificationKey, decimal Confidence);
+
+    internal sealed record VerifiedReceiptValues(
+        string TotalText,
+        decimal Total,
+        decimal TotalConfidence,
+        IReadOnlyList<VerifiedReceiptLine> Lines);
+
+    internal sealed record VerifiedReceiptLine(
+        int LineIndex,
+        decimal? Quantity,
+        decimal QuantityConfidence,
+        string? UnitPriceText,
+        decimal? UnitPrice,
+        decimal UnitPriceConfidence,
+        string AmountText,
+        decimal Amount,
+        decimal AmountConfidence);
 }

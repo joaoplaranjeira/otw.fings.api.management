@@ -36,6 +36,82 @@ public sealed class FinanceService(
         return new(household.Id, household.Name, household.Currency, household.TimeZone, membership.Role);
     }
 
+    public IReadOnlyList<HouseholdRoleResponse> GetHouseholdRoles() =>
+        Enum.GetValues<HouseholdRole>()
+            .Select(role => new HouseholdRoleResponse(role, role.ToString()))
+            .ToArray();
+
+    public async Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(
+        Guid householdId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, false, cancellationToken);
+        return await repository.GetHouseholdMembersAsync(householdId, cancellationToken);
+    }
+
+    public async Task<HouseholdMemberResponse> AddHouseholdMemberAsync(
+        Guid householdId,
+        long userId,
+        AddHouseholdMemberRequest request,
+        CancellationToken cancellationToken)
+    {
+        var requesterRole = await EnsureCanManageMembersAsync(householdId, userId, cancellationToken);
+        if (!Enum.IsDefined(request.Role))
+        {
+            throw new ValidationException("O papel indicado não é válido.");
+        }
+        if (requesterRole == HouseholdRole.Administrator &&
+            request.Role is HouseholdRole.Owner or HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("Um administrador só pode adicionar membros com os papéis Member ou Viewer.");
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await repository.GetActiveUserByEmailAsync(email, cancellationToken)
+            ?? throw new NotFoundException("Não existe um utilizador ativo com este email.");
+        if (await repository.HasHouseholdMemberAsync(householdId, user.Id, cancellationToken))
+        {
+            throw new ConflictException("O utilizador já pertence a este agregado.");
+        }
+
+        var member = new HouseholdMember
+        {
+            HouseholdId = householdId,
+            UserId = user.Id,
+            Role = request.Role
+        };
+        await repository.AddHouseholdMemberAsync(member, cancellationToken);
+        return new(member.Id, user.Id, user.Name, user.Username, user.Email, user.IsActive, member.Role);
+    }
+
+    public async Task RemoveHouseholdMemberAsync(
+        Guid householdId,
+        Guid memberId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        var requesterRole = await EnsureCanManageMembersAsync(householdId, userId, cancellationToken);
+        var member = await repository.GetHouseholdMemberAsync(householdId, memberId, cancellationToken)
+            ?? throw new NotFoundException("Membro não encontrado.");
+        if (member.UserId == userId)
+        {
+            throw new ValidationException("Não pode remover a sua própria associação ao agregado.");
+        }
+        if (requesterRole == HouseholdRole.Administrator &&
+            member.Role is HouseholdRole.Owner or HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("Um administrador não pode remover owners ou outros administradores.");
+        }
+        if (member.Role == HouseholdRole.Owner &&
+            await repository.CountHouseholdOwnersAsync(householdId, cancellationToken) <= 1)
+        {
+            throw new ConflictException("Não é possível remover o único owner do agregado.");
+        }
+
+        await repository.RemoveHouseholdMemberAsync(member, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(
         Guid householdId,
         long userId,
@@ -610,6 +686,20 @@ public sealed class FinanceService(
         {
             throw new ForbiddenException("O utilizador não tem permissões de escrita neste agregado.");
         }
+    }
+
+    private async Task<HouseholdRole> EnsureCanManageMembersAsync(
+        Guid householdId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        var role = await repository.GetMemberRoleAsync(householdId, userId, cancellationToken)
+            ?? throw new ForbiddenException("O utilizador não pertence ao agregado indicado.");
+        if (role is not HouseholdRole.Owner and not HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("O utilizador não tem permissões para gerir membros deste agregado.");
+        }
+        return role;
     }
 
     private static CategoryResponse Map(Category category) => new(
