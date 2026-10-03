@@ -1,0 +1,48 @@
+name: Deploy to Heroku
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heroku-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy container
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Heroku configuration
+        shell: bash
+        run: |
+          if [[ -z "$HEROKU_API_KEY" || -z "$HEROKU_APP_NAME" ]]; then
+            echo "::error::Configure the HEROKU_API_KEY and HEROKU_APP_NAME repository secrets."
+            exit 1
+          fi
+
+      - name: Install Heroku CLI
+        shell: bash
+        run: curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
+
+      - name: Authenticate with Heroku Container Registry
+        shell: bash
+        run: heroku container:login
+
+      - name: Build and push web image
+        shell: bash
+        run: heroku container:push web --app "$HEROKU_APP_NAME"
+
+      - name: Release web image
+        shell: bash
+        run: heroku container:release web --app "$HEROKU_APP_NAME"

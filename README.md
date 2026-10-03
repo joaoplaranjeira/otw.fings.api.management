@@ -39,6 +39,18 @@ Swagger está disponível em `/swagger` em desenvolvimento e o health check em `
 
 A task remove um container anterior com o mesmo nome, constrói a imagem, aplica as migrations e inicia a API em `http://localhost:5015`. As tasks `docker-logs-fings` e `docker-stop-fings` permitem acompanhar e parar o container.
 
+### Deploy automático no Heroku
+
+Cada `push` para o GitHub executa o workflow `.github/workflows/deploy-heroku.yml`, que constrói o `Dockerfile`, publica a imagem no Heroku Container Registry e cria uma nova release do processo `web`.
+
+Antes do primeiro deploy:
+
+1. Criar a aplicação no Heroku e configurar o stack de containers com `heroku stack:set container --app <nome-da-app>`.
+2. Configurar na aplicação as variáveis de ambiente necessárias, incluindo a ligação à base de dados e as definições JWT.
+3. Adicionar ao repositório GitHub os secrets `HEROKU_API_KEY` e `HEROKU_APP_NAME` em **Settings > Secrets and variables > Actions**.
+
+O Heroku fornece a variável `PORT` em runtime; o container usa-a automaticamente e mantém a porta `8080` como valor por omissão para execução local.
+
 O contrato para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md).
 
 ## Semântica do orçamento

@@ -12,5 +12,4 @@ RUN dotnet publish "otw.fings.api.management.csproj" -c Release -o /app/publish 
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-ENV ASPNETCORE_HTTP_PORTS=8080
-ENTRYPOINT ["dotnet", "otw.fings.api.management.dll"]
+CMD ["sh", "-c", "dotnet otw.fings.api.management.dll --urls http://0.0.0.0:${PORT:-8080}"]
