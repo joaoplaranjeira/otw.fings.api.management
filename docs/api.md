@@ -20,6 +20,7 @@
 - `PATCH /api/households/{householdId}/expenses/{expenseId}` — edita o movimento e, opcionalmente, substitui as parcelas na mesma operação.
 - `PUT /api/households/{householdId}/expenses/{expenseId}/lines` — substitui todas as parcelas, mantendo o total atual.
 - `GET/POST /api/households/{householdId}/recurring-expenses`
+- `POST /api/households/{householdId}/recurring-expenses/{recurringExpenseId}/materialize` — cria imediatamente todas as ocorrências vencidas da regra, sem duplicar movimentos existentes.
 - `GET /api/households/{householdId}/dashboard/{year}/{month}`
 - `POST /api/households/{householdId}/receipts/parse` — campo multipart `file`; não persiste o ficheiro.
 

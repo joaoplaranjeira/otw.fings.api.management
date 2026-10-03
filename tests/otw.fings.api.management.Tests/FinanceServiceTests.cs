@@ -471,6 +471,63 @@ public sealed class FinanceServiceTests
         });
     }
 
+    [Fact]
+    public async Task CreateRecurringExpense_WithMaterializeNow_CreatesEveryDueOccurrence()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var repository = new FinanceRepository(db);
+        var materializer = new RecurringExpenseMaterializer(repository);
+        var service = new FinanceService(repository, materializer);
+        var today = TodayInLisbon();
+        var startDate = today.AddMonths(-2);
+
+        var created = await service.CreateRecurringExpenseAsync(
+            household.Id,
+            1,
+            new(category.Id, null, "Internet", "Operador", null, 35m,
+                RecurrenceFrequency.Monthly, startDate, null, true),
+            CancellationToken.None);
+
+        var expenses = await db.Expenses.OrderBy(x => x.Date).ToListAsync();
+        Assert.Equal(3, expenses.Count);
+        Assert.Equal([startDate, startDate.AddMonths(1), startDate.AddMonths(2)], expenses.Select(x => x.Date));
+        Assert.Equal(startDate.AddMonths(3), created.NextOccurrenceDate);
+    }
+
+    [Fact]
+    public async Task MaterializeRecurringExpense_CreatesPendingOccurrencesIdempotently()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var repository = new FinanceRepository(db);
+        var materializer = new RecurringExpenseMaterializer(repository);
+        var service = new FinanceService(repository, materializer);
+        var today = TodayInLisbon();
+        var recurring = await service.CreateRecurringExpenseAsync(
+            household.Id,
+            1,
+            new(category.Id, null, "Seguro", null, null, 20m,
+                RecurrenceFrequency.Monthly, today.AddMonths(-1), null),
+            CancellationToken.None);
+
+        var first = await service.MaterializeRecurringExpenseAsync(
+            household.Id, recurring.Id, 1, CancellationToken.None);
+        var second = await service.MaterializeRecurringExpenseAsync(
+            household.Id, recurring.Id, 1, CancellationToken.None);
+
+        Assert.Equal(2, first.CreatedCount);
+        Assert.Equal(0, second.CreatedCount);
+        Assert.Equal(today.AddMonths(1), second.NextOccurrenceDate);
+        Assert.Equal(2, await db.Expenses.CountAsync());
+    }
+
+    private static DateOnly TodayInLisbon()
+    {
+        var lisbon = TimeZoneInfo.FindSystemTimeZoneById("Europe/Lisbon");
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, lisbon).DateTime);
+    }
+
     private static FingsDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<FingsDbContext>()

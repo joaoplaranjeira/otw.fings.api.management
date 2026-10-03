@@ -130,7 +130,8 @@ public sealed record CreateRecurringExpenseRequest(
     decimal Amount,
     RecurrenceFrequency Frequency,
     DateOnly StartDate,
-    DateOnly? EndDate);
+    DateOnly? EndDate,
+    bool MaterializeNow = false);
 
 public sealed record UpdateRecurringExpenseRequest(
     Guid CategoryId,
@@ -154,6 +155,12 @@ public sealed record RecurringExpenseResponse(
     RecurrenceFrequency Frequency,
     DateOnly StartDate,
     DateOnly? EndDate,
+    DateOnly NextOccurrenceDate,
+    bool IsActive);
+
+public sealed record RecurringExpenseMaterializationResponse(
+    int CreatedCount,
+    DateOnly ThroughDate,
     DateOnly NextOccurrenceDate,
     bool IsActive);
 

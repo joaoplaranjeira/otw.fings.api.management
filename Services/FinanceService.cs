@@ -4,8 +4,13 @@ using otw.fings.api.management.Services.Interfaces;
 
 namespace otw.fings.api.management.Services;
 
-public sealed class FinanceService(IFinanceRepository repository) : IFinanceService
+public sealed class FinanceService(
+    IFinanceRepository repository,
+    IRecurringExpenseMaterializer? materializer = null) : IFinanceService
 {
+    private readonly IRecurringExpenseMaterializer recurringExpenseMaterializer =
+        materializer ?? new RecurringExpenseMaterializer(repository);
+
     public Task<IReadOnlyList<HouseholdResponse>> GetHouseholdsAsync(long userId, CancellationToken cancellationToken) =>
         repository.GetHouseholdsAsync(userId, cancellationToken);
 
@@ -518,6 +523,10 @@ public sealed class FinanceService(IFinanceRepository repository) : IFinanceServ
             NextOccurrenceDate = request.StartDate
         };
         await repository.AddRecurringExpenseAsync(recurring, cancellationToken);
+        if (request.MaterializeNow)
+        {
+            await recurringExpenseMaterializer.MaterializeAsync(recurring, TodayInLisbon(), cancellationToken);
+        }
         return Map(recurring);
     }
 
@@ -528,6 +537,20 @@ public sealed class FinanceService(IFinanceRepository repository) : IFinanceServ
     {
         await EnsureMemberAsync(householdId, userId, false, cancellationToken);
         return (await repository.GetRecurringExpensesAsync(householdId, cancellationToken)).Select(Map).ToArray();
+    }
+
+    public async Task<RecurringExpenseMaterializationResponse> MaterializeRecurringExpenseAsync(
+        Guid householdId,
+        Guid recurringExpenseId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, true, cancellationToken);
+        var recurring = await repository.GetRecurringExpenseAsync(householdId, recurringExpenseId, cancellationToken)
+            ?? throw new NotFoundException("Despesa recorrente não encontrada.");
+        var through = TodayInLisbon();
+        var createdCount = await recurringExpenseMaterializer.MaterializeAsync(recurring, through, cancellationToken);
+        return new(createdCount, through, recurring.NextOccurrenceDate, recurring.IsActive);
     }
 
     public async Task<RecurringExpenseResponse> UpdateRecurringExpenseAsync(
@@ -610,6 +633,12 @@ public sealed class FinanceService(IFinanceRepository repository) : IFinanceServ
         expense.Id, expense.CategoryId, expense.SubcategoryId, expense.Description,
         expense.MerchantName, expense.MerchantTaxNumber, expense.Amount, expense.Frequency,
         expense.StartDate, expense.EndDate, expense.NextOccurrenceDate, expense.IsActive);
+
+    private static DateOnly TodayInLisbon()
+    {
+        var lisbon = TimeZoneInfo.FindSystemTimeZoneById("Europe/Lisbon");
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, lisbon).DateTime);
+    }
 
     private async Task<List<(CreateExpenseLineRequest Request, Category Category, Subcategory? Subcategory)>> ResolveLinesAsync(
         Guid householdId,

@@ -490,13 +490,29 @@ Ambos os endpoints devolvem o movimento completo no mesmo formato da listagem.
   "amount": 35.00,
   "frequency": 2,
   "startDate": "2027-01-10",
-  "endDate": "2027-12-10"
+  "endDate": "2027-12-10",
+  "materializeNow": true
 }
 ```
 
 Periodicidade: `1 = Weekly`, `2 = Monthly`, `3 = Quarterly`, `4 = Annual`.
 
+`materializeNow` é opcional. Quando é `true`, a criação da regra gera imediatamente todas as ocorrências vencidas desde `startDate` até hoje.
+
 Um worker cria automaticamente as despesas vencidas. A combinação regra/data é única, pelo que uma ocorrência não deve aparecer duplicada. Listar regras com `GET /api/households/{householdId}/recurring-expenses`.
+
+Para forçar a criação dos movimentos pendentes de uma regra existente:
+
+`POST /api/households/{householdId}/recurring-expenses/{recurringExpenseId}/materialize`
+
+```json
+{
+  "createdCount": 3,
+  "throughDate": "2027-03-10",
+  "nextOccurrenceDate": "2027-04-10",
+  "isActive": true
+}
+```
 
 ## 11. Dashboard mensal
 

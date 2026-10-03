@@ -36,4 +36,15 @@ public sealed class RecurringExpensesController(IFinanceService service, ICurren
             currentUser.UserId,
             request,
             cancellationToken));
+
+    [HttpPost("{recurringExpenseId:guid}/materialize")]
+    public async Task<ActionResult<RecurringExpenseMaterializationResponse>> Materialize(
+        Guid householdId,
+        Guid recurringExpenseId,
+        CancellationToken cancellationToken) =>
+        Ok(await service.MaterializeRecurringExpenseAsync(
+            householdId,
+            recurringExpenseId,
+            currentUser.UserId,
+            cancellationToken));
 }

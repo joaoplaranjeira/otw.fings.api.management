@@ -20,6 +20,7 @@ public interface IFinanceService
     Task<RecurringExpenseResponse> CreateRecurringExpenseAsync(Guid householdId, long userId, CreateRecurringExpenseRequest request, CancellationToken cancellationToken);
     Task<RecurringExpenseResponse> UpdateRecurringExpenseAsync(Guid householdId, Guid recurringExpenseId, long userId, UpdateRecurringExpenseRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<RecurringExpenseResponse>> GetRecurringExpensesAsync(Guid householdId, long userId, CancellationToken cancellationToken);
+    Task<RecurringExpenseMaterializationResponse> MaterializeRecurringExpenseAsync(Guid householdId, Guid recurringExpenseId, long userId, CancellationToken cancellationToken);
 }
 
 public interface IReceiptParser
@@ -46,4 +47,5 @@ public interface IReceiptParseReviewService
 public interface IRecurringExpenseMaterializer
 {
     Task<int> MaterializeDueAsync(DateOnly through, CancellationToken cancellationToken);
+    Task<int> MaterializeAsync(RecurringExpense recurringExpense, DateOnly through, CancellationToken cancellationToken);
 }

@@ -9,6 +9,20 @@ public sealed class RecurringExpenseMaterializer(IFinanceRepository repository) 
     public async Task<int> MaterializeDueAsync(DateOnly through, CancellationToken cancellationToken)
     {
         var rules = await repository.GetDueRecurringExpensesAsync(through, cancellationToken);
+        return await MaterializeAsync(rules, through, cancellationToken);
+    }
+
+    public Task<int> MaterializeAsync(
+        RecurringExpense recurringExpense,
+        DateOnly through,
+        CancellationToken cancellationToken) =>
+        MaterializeAsync([recurringExpense], through, cancellationToken);
+
+    private async Task<int> MaterializeAsync(
+        IReadOnlyList<RecurringExpense> rules,
+        DateOnly through,
+        CancellationToken cancellationToken)
+    {
         var expenses = new List<Expense>();
         foreach (var rule in rules)
         {

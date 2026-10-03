@@ -45,7 +45,7 @@ Cada `push` para o GitHub executa o workflow `.github/workflows/deploy-heroku.ym
 
 Antes do primeiro deploy:
 
-1. Criar a aplicação no Heroku e configurar o stack de containers com `heroku stack:set container --app <nome-da-app>`.
+1. Criar a aplicação no Heroku. O workflow muda automaticamente o stack da aplicação para `container`.
 2. Configurar na aplicação as variáveis de ambiente necessárias, incluindo a ligação à base de dados e as definições JWT.
 3. Adicionar ao repositório GitHub os secrets `HEROKU_API_KEY` e `HEROKU_APP_NAME` em **Settings > Secrets and variables > Actions**.
 
