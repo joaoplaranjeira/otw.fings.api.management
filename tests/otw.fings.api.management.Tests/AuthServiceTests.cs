@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using otw.fings.api.management.Domain.Entities;
+using otw.fings.api.management.Domain.Enums;
+using otw.fings.api.management.DTOs;
 using otw.fings.api.management.Infrastructure.Data;
 using otw.fings.api.management.Infrastructure.Repositories;
 using otw.fings.api.management.Services;
@@ -113,6 +115,74 @@ public sealed class AuthServiceTests
             CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Register_WithoutHousehold_CreatesOnlyUser()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var result = await service.RegisterAsync(
+            new RegisterUserRequest("Maria", "maria", "MARIA@example.com"),
+            CancellationToken.None);
+
+        Assert.Equal("maria@example.com", result.Email);
+        Assert.Single(db.Users);
+        Assert.Empty(db.Households);
+        Assert.Empty(db.HouseholdMembers);
+    }
+
+    [Fact]
+    public async Task Register_WithInvitation_AddsUserToHouseholdAndConsumesInvitation()
+    {
+        await using var db = CreateDbContext();
+        var owner = new User
+        {
+            Id = 1,
+            Name = "Owner",
+            Username = "owner",
+            Email = "owner@example.com",
+            InsertedDate = DateTime.UtcNow,
+            UpdatedDate = DateTime.UtcNow
+        };
+        var household = new Household { Name = "Família" };
+        const string code = "FINGS-ABCD-2345";
+        var invitation = new HouseholdInvitation
+        {
+            HouseholdId = household.Id,
+            Email = "maria@example.com",
+            Role = HouseholdRole.Member,
+            CodeHash = HouseholdInvitationCodes.Hash(code),
+            ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(1),
+            CreatedByUserId = owner.Id
+        };
+        db.AddRange(owner, household, invitation);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var result = await service.RegisterAsync(
+            new RegisterUserRequest("Maria", "maria", "maria@example.com", InvitationCode: code),
+            CancellationToken.None);
+
+        var membership = await db.HouseholdMembers.SingleAsync();
+        Assert.Equal(result.Id, membership.UserId);
+        Assert.Equal(household.Id, membership.HouseholdId);
+        Assert.Equal(HouseholdRole.Member, membership.Role);
+        Assert.Equal(HouseholdInvitationStatus.Accepted, invitation.Status);
+        Assert.Equal(result.Id, invitation.AcceptedByUserId);
+        Assert.NotNull(invitation.AcceptedAtUtc);
+    }
+
+    [Fact]
+    public async Task Register_RejectsHouseholdAndInvitationTogether()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.RegisterAsync(
+            new RegisterUserRequest("Maria", "maria", "maria@example.com", "Família", "FINGS-ABCD-2345"),
+            CancellationToken.None));
+    }
+
     private static AuthService CreateService(FingsDbContext db) => new(
         new AuthRepository(db),
         new TrackingEmailService(),
@@ -136,6 +206,15 @@ public sealed class AuthServiceTests
             SendCount++;
             return Task.FromResult(true);
         }
+
+        public Task<bool> SendHouseholdInvitationEmailAsync(
+            string email,
+            string householdName,
+            string role,
+            string invitationCode,
+            string invitationUrl,
+            DateTimeOffset expiresAt,
+            CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class StubTokenService : ITokenService

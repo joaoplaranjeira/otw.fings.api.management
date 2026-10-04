@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
+using otw.fings.api.management.Domain.Catalogs;
 using otw.fings.api.management.Infrastructure.Repositories.Interfaces;
 using otw.fings.api.management.Services.Interfaces;
 using otw.fings.api.management.Settings;
@@ -132,6 +133,13 @@ public sealed class AuthService(
     {
         var email = Normalize(request.Email);
         var username = Normalize(request.Username);
+        var householdName = request.HouseholdName?.Trim();
+        var invitationCode = request.InvitationCode?.Trim();
+        if (!string.IsNullOrWhiteSpace(householdName) && !string.IsNullOrWhiteSpace(invitationCode))
+        {
+            throw new ValidationException("Não pode criar um agregado e aceitar um convite no mesmo registo.");
+        }
+
         if (await repository.GetUserByEmailAsync(email, cancellationToken) is not null)
         {
             throw new ConflictException("Já existe um utilizador com este email.");
@@ -141,21 +149,55 @@ public sealed class AuthService(
             throw new ConflictException("Já existe um utilizador com este username.");
         }
 
+        HouseholdInvitation? invitation = null;
+        if (!string.IsNullOrWhiteSpace(invitationCode))
+        {
+            invitation = await repository.GetHouseholdInvitationByCodeHashAsync(
+                HouseholdInvitationCodes.Hash(invitationCode),
+                cancellationToken) ?? throw new NotFoundException("Convite não encontrado.");
+            EnsureInvitationCanBeAccepted(invitation, email);
+        }
+
         var now = DateTime.UtcNow;
+        var nowOffset = new DateTimeOffset(now, TimeSpan.Zero);
         var user = new User
         {
             Name = request.Name.Trim(),
             Username = username,
             Email = email,
-            Role = "Owner",
+            Role = invitation?.Role.ToString() ?? (!string.IsNullOrWhiteSpace(householdName) ? "Owner" : "User"),
             Profile = "Utilizador",
             InsertedUser = email,
             InsertedDate = now,
             UpdatedDate = now
         };
-        var household = new Household { Name = request.HouseholdName.Trim() };
-        var membership = new HouseholdMember { HouseholdId = household.Id, Role = HouseholdRole.Owner };
-        await repository.RegisterAsync(user, household, membership, cancellationToken);
+        Household? household = null;
+        HouseholdMember? membership = null;
+        IReadOnlyList<Category>? categories = null;
+
+        if (!string.IsNullOrWhiteSpace(householdName))
+        {
+            household = new Household { Name = householdName };
+            membership = new HouseholdMember { HouseholdId = household.Id, Role = HouseholdRole.Owner };
+            categories = StandardCategoryCatalog.CreateFor(household.Id);
+        }
+        else if (invitation is not null)
+        {
+            membership = new HouseholdMember
+            {
+                HouseholdId = invitation.HouseholdId,
+                Role = invitation.Role
+            };
+        }
+
+        await repository.RegisterAsync(
+            user,
+            household,
+            membership,
+            categories,
+            invitation,
+            invitation is null ? null : nowOffset,
+            cancellationToken);
         return Map(user);
     }
 
@@ -202,6 +244,24 @@ public sealed class AuthService(
 
     private static UserResponse Map(User user) => new(user.Id, user.Name, user.Username, user.Email, user.IsActive);
     private static string Normalize(string value) => value.Trim().ToLowerInvariant();
+
+    private static void EnsureInvitationCanBeAccepted(HouseholdInvitation invitation, string email)
+    {
+        if (invitation.Status == HouseholdInvitationStatus.Accepted)
+        {
+            throw new ConflictException("O convite já foi aceite.");
+        }
+        if (invitation.Status == HouseholdInvitationStatus.Revoked ||
+            invitation.Status == HouseholdInvitationStatus.Expired ||
+            invitation.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            throw new GoneException("O convite expirou ou foi revogado.");
+        }
+        if (!string.Equals(invitation.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationException("O email não corresponde ao destinatário do convite.");
+        }
+    }
     private static bool CodesMatch(string expectedCode, string suppliedCode)
     {
         var expected = Encoding.UTF8.GetBytes(expectedCode);

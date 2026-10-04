@@ -17,4 +17,12 @@ public interface ITokenService
 public interface IEmailService
 {
     Task<bool> SendOtpEmailAsync(string email, string otpCode, CancellationToken cancellationToken);
+    Task<bool> SendHouseholdInvitationEmailAsync(
+        string email,
+        string householdName,
+        string role,
+        string invitationCode,
+        string invitationUrl,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken);
 }

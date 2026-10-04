@@ -19,20 +19,73 @@ public sealed class LoopsEmailService(
             return false;
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://app.loops.so/api/v1/transactional");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        request.Content = JsonContent.Create(new
-        {
+        return await SendAsync(
+            apiKey,
             transactionalId,
             email,
-            dataVariables = new { otpCode }
-        });
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+            new { otpCode },
+            "OTP",
+            cancellationToken);
+    }
+
+    public async Task<bool> SendHouseholdInvitationEmailAsync(
+        string email,
+        string householdName,
+        string role,
+        string invitationCode,
+        string invitationUrl,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken)
+    {
+        var apiKey = configuration["Loops:ApiKey"];
+        var transactionalId = configuration["Loops:InvitationTransactionalId"];
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(transactionalId))
         {
-            logger.LogError("Loops failed to send an OTP email. Status: {StatusCode}", response.StatusCode);
+            logger.LogError("Loops household invitation email configuration is incomplete.");
+            return false;
         }
 
-        return response.IsSuccessStatusCode;
+        return await SendAsync(
+            apiKey,
+            transactionalId,
+            email,
+            new
+            {
+                householdName,
+                role,
+                invitationCode,
+                invitationUrl,
+                expiresAt = expiresAt.ToString("yyyy-MM-dd HH:mm 'UTC'")
+            },
+            "household invitation",
+            cancellationToken);
+    }
+
+    private async Task<bool> SendAsync(
+        string apiKey,
+        string transactionalId,
+        string email,
+        object dataVariables,
+        string emailType,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://app.loops.so/api/v1/transactional");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            request.Content = JsonContent.Create(new { transactionalId, email, dataVariables });
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogError("Loops failed to send a {EmailType} email. Status: {StatusCode}", emailType, response.StatusCode);
+            }
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException exception)
+        {
+            logger.LogError(exception, "Loops request failed while sending a {EmailType} email.", emailType);
+            return false;
+        }
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using otw.fings.api.management.Infrastructure.Data;
+using otw.fings.api.management.Infrastructure.Configuration;
 using otw.fings.api.management.Infrastructure.Repositories;
 using otw.fings.api.management.Infrastructure.Repositories.Interfaces;
 using otw.fings.api.management.Middleware;
@@ -13,6 +14,7 @@ using otw.fings.api.management.Services;
 using otw.fings.api.management.Services.Interfaces;
 using otw.fings.api.management.Settings;
 
+DotEnvLoader.LoadIfPresent();
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOptions<JwtSettings>()
@@ -21,6 +23,10 @@ builder.Services.AddOptions<JwtSettings>()
     .ValidateOnStart();
 builder.Services.Configure<OpenAiSettings>(builder.Configuration.GetSection(OpenAiSettings.SectionName));
 builder.Services.Configure<OtpSettings>(builder.Configuration.GetSection(OtpSettings.SectionName));
+builder.Services.AddOptions<HouseholdInvitationSettings>()
+    .Bind(builder.Configuration.GetSection(HouseholdInvitationSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 var jwt = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("Jwt configuration is required.");
@@ -85,8 +91,10 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
+builder.Services.AddScoped<IHouseholdInvitationRepository, HouseholdInvitationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFinanceService, FinanceService>();
+builder.Services.AddScoped<IHouseholdInvitationService, HouseholdInvitationService>();
 builder.Services.AddScoped<IReceiptParser, OpenAiReceiptParser>();
 builder.Services.AddScoped<IReceiptParseReviewService, ReceiptParseReviewService>();
 builder.Services.AddScoped<IRecurringExpenseMaterializer, RecurringExpenseMaterializer>();

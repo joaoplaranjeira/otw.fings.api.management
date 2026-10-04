@@ -14,7 +14,8 @@ public sealed record RegisterUserRequest(
     [Required, MaxLength(200)] string Name,
     [Required, MaxLength(200)] string Username,
     [Required, EmailAddress, MaxLength(255)] string Email,
-    [Required, MaxLength(200)] string HouseholdName);
+    [MaxLength(200)] string? HouseholdName = null,
+    [MaxLength(50)] string? InvitationCode = null);
 
 public sealed record UserResponse(long Id, string Name, string Username, string Email, bool IsActive);
 

@@ -17,6 +17,7 @@ public sealed class ApiExceptionHandler(
             ValidationException => (StatusCodes.Status422UnprocessableEntity, "Business validation failed"),
             ReceiptImageQualityException => (StatusCodes.Status422UnprocessableEntity, "Receipt image quality insufficient"),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
+            GoneException => (StatusCodes.Status410Gone, "Resource no longer available"),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             IntegrationUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Integration unavailable"),

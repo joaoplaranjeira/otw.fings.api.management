@@ -15,6 +15,13 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
     public Task<User?> GetUserByIdAsync(long id, CancellationToken cancellationToken) =>
         dbContext.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
+    public Task<HouseholdInvitation?> GetHouseholdInvitationByCodeHashAsync(
+        string codeHash,
+        CancellationToken cancellationToken) =>
+        dbContext.HouseholdInvitations
+            .Include(x => x.Household)
+            .SingleOrDefaultAsync(x => x.CodeHash == codeHash, cancellationToken);
+
     public async Task<IReadOnlyList<string>> GetPermissionsAsync(long userId, CancellationToken cancellationToken) =>
         await dbContext.UserPermissions.AsNoTracking()
             .Where(x => x.UserId == userId)
@@ -55,19 +62,44 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
 
     public async Task RegisterAsync(
         User user,
-        Household household,
-        HouseholdMember membership,
+        Household? household,
+        HouseholdMember? membership,
+        IReadOnlyList<Category>? categories,
+        HouseholdInvitation? invitation,
+        DateTimeOffset? invitationAcceptedAt,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
-        membership.UserId = user.Id;
-        membership.HouseholdId = household.Id;
-        dbContext.Households.Add(household);
-        dbContext.HouseholdMembers.Add(membership);
+
+        if (household is not null)
+        {
+            dbContext.Households.Add(household);
+            if (categories is not null) dbContext.Categories.AddRange(categories);
+        }
+
+        if (membership is not null)
+        {
+            membership.UserId = user.Id;
+            dbContext.HouseholdMembers.Add(membership);
+        }
+
+        if (invitation is not null)
+        {
+            invitation.Status = HouseholdInvitationStatus.Accepted;
+            invitation.AcceptedByUserId = user.Id;
+            invitation.AcceptedAtUtc = invitationAcceptedAt;
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>

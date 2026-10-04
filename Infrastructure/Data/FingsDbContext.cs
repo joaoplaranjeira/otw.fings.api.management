@@ -18,6 +18,7 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
     public DbSet<Household> Households => Set<Household>();
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+    public DbSet<HouseholdInvitation> HouseholdInvitations => Set<HouseholdInvitation>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
     public DbSet<BudgetPeriod> BudgetPeriods => Set<BudgetPeriod>();
@@ -72,6 +73,21 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
                 .HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.User).WithMany()
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HouseholdInvitation>(entity =>
+        {
+            entity.Property(x => x.Email).HasMaxLength(255);
+            entity.Property(x => x.Code).HasMaxLength(50);
+            entity.Property(x => x.CodeHash).HasMaxLength(64).IsFixedLength();
+            entity.HasIndex(x => x.CodeHash).IsUnique();
+            entity.HasIndex(x => new { x.HouseholdId, x.Email, x.Status });
+            entity.HasOne(x => x.Household).WithMany(x => x.Invitations)
+                .HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AcceptedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Category>(entity =>

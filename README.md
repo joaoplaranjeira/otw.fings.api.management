@@ -8,6 +8,7 @@ Web API ASP.NET Core 10 para gestão financeira pessoal e familiar.
 - JWT Bearer válido durante um mês de calendário a partir da emissão;
 - isolamento por agregado familiar;
 - gestão de membros e papéis por agregado familiar;
+- convites para agregados por email, código e link;
 - catálogo inicial de categorias e subcategorias criado automaticamente por agregado;
 - orçamentos mensais válidos num intervalo de meses;
 - criação automática de uma receita planeada por cada mês do orçamento;
@@ -27,6 +28,8 @@ dotnet build --no-restore
 dotnet run -- --migrate
 dotnet run
 ```
+
+Na execução local, o `.env` da raiz é carregado automaticamente, incluindo pelo `dotnet ef database update`. Variáveis já definidas no ambiente têm sempre prioridade sobre o ficheiro.
 
 As migrations `BackfillStandardCategories` e `AddNotApplicableCategories` acrescentam o catálogo inicial e as opções “Não aplicável” aos agregados já existentes, preservando categorias e subcategorias com o mesmo nome.
 
@@ -52,7 +55,7 @@ Antes do primeiro deploy:
 
 O Heroku fornece a variável `PORT` em runtime; o container usa-a automaticamente e mantém a porta `8080` como valor por omissão para execução local.
 
-O contrato geral para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md), com a gestão de membros detalhada em [`docs/household-members-frontend.md`](docs/household-members-frontend.md).
+O contrato geral para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md), com a gestão de membros detalhada em [`docs/household-members-frontend.md`](docs/household-members-frontend.md) e os convites em [`docs/household-invitations-frontend.md`](docs/household-invitations-frontend.md).
 
 ## Semântica do orçamento
 

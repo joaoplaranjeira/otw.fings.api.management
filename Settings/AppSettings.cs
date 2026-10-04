@@ -35,3 +35,14 @@ public sealed class OtpSettings
 
     public bool BypassEnabled { get; init; }
 }
+
+public sealed class HouseholdInvitationSettings
+{
+    public const string SectionName = "HouseholdInvitations";
+
+    [Required]
+    public string FrontendBaseUrl { get; init; } = "http://localhost:5173";
+
+    [Range(1, 30)]
+    public int ExpirationDays { get; init; } = 7;
+}

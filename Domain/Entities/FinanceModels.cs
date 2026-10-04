@@ -6,6 +6,7 @@ public sealed class Household : Entity
     public string Currency { get; set; } = "EUR";
     public string TimeZone { get; set; } = "Europe/Lisbon";
     public ICollection<HouseholdMember> Members { get; set; } = [];
+    public ICollection<HouseholdInvitation> Invitations { get; set; } = [];
 }
 
 public sealed class HouseholdMember : Entity
@@ -15,6 +16,22 @@ public sealed class HouseholdMember : Entity
     public HouseholdRole Role { get; set; }
     public Household Household { get; set; } = null!;
     public User User { get; set; } = null!;
+}
+
+public sealed class HouseholdInvitation : Entity
+{
+    public Guid HouseholdId { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public HouseholdRole Role { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string CodeHash { get; set; } = string.Empty;
+    public HouseholdInvitationStatus Status { get; set; } = HouseholdInvitationStatus.Pending;
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public long CreatedByUserId { get; set; }
+    public long? AcceptedByUserId { get; set; }
+    public DateTimeOffset? AcceptedAtUtc { get; set; }
+    public bool EmailSent { get; set; }
+    public Household Household { get; set; } = null!;
 }
 
 public sealed class Category : Entity

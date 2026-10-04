@@ -8,6 +8,14 @@ public enum HouseholdRole
     Viewer = 4
 }
 
+public enum HouseholdInvitationStatus
+{
+    Pending = 1,
+    Accepted = 2,
+    Expired = 3,
+    Revoked = 4
+}
+
 public enum BudgetStatus
 {
     Active = 1,

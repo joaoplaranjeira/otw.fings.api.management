@@ -1,0 +1,73 @@
+<mjml>
+  <mj-head>
+    <mj-title>Foste convidado para um agregado Fings</mj-title>
+    <mj-preview>Usa o link ou o código para entrares no agregado {DATA_VARIABLE:householdName}.</mj-preview>
+    <mj-font name="DM Sans" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" />
+    <mj-font name="Manrope" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&amp;display=swap" />
+    <mj-attributes>
+      <mj-all font-family="'DM Sans', Arial, sans-serif" />
+      <mj-text color="#17171D" font-size="16px" line-height="26px" />
+      <mj-button background-color="#5545ED" color="#FFFFFF" border-radius="12px" font-weight="700" />
+    </mj-attributes>
+    <mj-style inline="inline">
+      .email-shell { box-shadow: 0 20px 60px rgba(23, 23, 29, 0.08); }
+      .invitation-code div { letter-spacing: 2px !important; }
+    </mj-style>
+  </mj-head>
+
+  <mj-body background-color="#F5F5F7" width="600px">
+    <mj-section padding="32px 16px 0">
+      <mj-column><mj-spacer height="1px" /></mj-column>
+    </mj-section>
+
+    <mj-wrapper css-class="email-shell" background-color="#FFFFFF" border-radius="22px" padding="0">
+      <mj-section background-color="#17171D" border-radius="22px 22px 0 0" padding="36px 42px">
+        <mj-column>
+          <mj-text padding="0 0 12px" color="#BDB5FF" font-size="11px" font-weight="800" letter-spacing="1.5px">
+            CONVITE PARA AGREGADO
+          </mj-text>
+          <mj-text padding="0" color="#FFFFFF" font-family="'Manrope', Arial, sans-serif" font-size="32px" font-weight="800" line-height="40px">
+            Junta-te a {DATA_VARIABLE:householdName}.
+          </mj-text>
+          <mj-text padding="14px 0 0" color="#A9A8B0">
+            Foste convidado com o papel {DATA_VARIABLE:role}.
+          </mj-text>
+        </mj-column>
+      </mj-section>
+
+      <mj-section padding="36px 42px 16px">
+        <mj-column>
+          <mj-button href="{DATA_VARIABLE:invitationUrl}" padding="0 0 28px" inner-padding="15px 28px">
+            Aceitar convite
+          </mj-button>
+          <mj-text align="center" padding="0 0 10px" color="#777985" font-size="11px" font-weight="800" letter-spacing="1.2px">
+            OU USA ESTE CÓDIGO
+          </mj-text>
+          <mj-text css-class="invitation-code" align="center" container-background-color="#F0EEFF" border="1px solid #E2DEFF" border-radius="16px" color="#5545ED" font-family="'Manrope', Arial, sans-serif" font-size="26px" font-weight="800" padding="22px 14px">
+            {DATA_VARIABLE:invitationCode}
+          </mj-text>
+          <mj-text align="center" padding="14px 0 0" color="#777985" font-size="13px">
+            O convite é válido até {DATA_VARIABLE:expiresAt}.
+          </mj-text>
+        </mj-column>
+      </mj-section>
+
+      <mj-section padding="16px 42px 40px" border-radius="0 0 22px 22px">
+        <mj-column>
+          <mj-divider border-width="1px" border-color="#E9E9EE" padding="0 0 24px" />
+          <mj-text padding="0" color="#4C4C57" font-size="14px" line-height="23px">
+            O convite só pode ser utilizado pela conta associada a este endereço de email. Se não estavas à espera deste convite, podes ignorá-lo.
+          </mj-text>
+        </mj-column>
+      </mj-section>
+    </mj-wrapper>
+
+    <mj-section padding="24px 24px 34px">
+      <mj-column>
+        <mj-text align="center" padding="0" color="#9A9AA3" font-size="12px">
+          Fings · A tua vida financeira, simples.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

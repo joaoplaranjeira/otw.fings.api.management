@@ -17,6 +17,7 @@ Depois de publicares o email, configura no ficheiro `.env` da API:
 ```env
 Loops__ApiKey=CHAVE_DA_API_LOOPS
 Loops__TransactionalId=ID_DO_EMAIL_TRANSACIONAL_PUBLICADO
+Loops__InvitationTransactionalId=ID_DO_EMAIL_TRANSACIONAL_DE_CONVITE
 ```
 
 Não coloques estes valores em `appsettings.json` nem os adiciones ao repositório. O `transactionalId` tem de identificar a versão publicada deste email transacional.
@@ -38,6 +39,18 @@ O ficheiro `fings-otp.mjml` é a fonte editável. O ficheiro `fings-otp-preview.
 Endpoint: `POST https://app.loops.so/api/v1/transactional`
 
 `otpCode` é obrigatório e sensível a maiúsculas/minúsculas. Envia-o como string para preservar eventuais zeros à esquerda.
+
+## Email de convite para agregado
+
+Cria um segundo email transacional a partir de `fings-household-invitation.mjml`, publica-o e configura o respetivo ID em `Loops__InvitationTransactionalId`.
+
+Variáveis obrigatórias:
+
+- `householdName`;
+- `role`;
+- `invitationCode`;
+- `invitationUrl`;
+- `expiresAt`.
 
 ## Teste antes de produção
 

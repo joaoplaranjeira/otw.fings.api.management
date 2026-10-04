@@ -6,10 +6,11 @@ Este documento descreve a funcionalidade atualmente implementada na API `otw.fin
 
 A primeira versão permite:
 
-- registar um utilizador e criar o seu primeiro agregado familiar;
+- registar um utilizador com ou sem criar o seu primeiro agregado familiar;
 - autenticar por código OTP enviado por email;
 - gerir vários agregados por utilizador;
 - adicionar, listar e remover membros dos agregados familiares;
+- convidar membros por email, com código, link e role previamente definida;
 - criar categorias e subcategorias de despesa;
 - definir um orçamento mensal aplicável durante um intervalo de meses;
 - distribuir parte ou todo o orçamento por categorias;
@@ -19,7 +20,7 @@ A primeira versão permite:
 - consultar o orçamento disponível e a execução por categoria num mês;
 - enviar a imagem de um talão para extração transitória através da OpenAI.
 
-Não estão ainda disponíveis edição, cancelamento ou eliminação de registos, convites por email para utilizadores não registados, receitas manuais, projeções históricas avançadas, exportações ou gamificação.
+Não estão ainda disponíveis edição, cancelamento ou eliminação de registos, receitas manuais, projeções históricas avançadas, exportações ou gamificação.
 
 ## 2. Ambientes e convenções
 
@@ -36,7 +37,7 @@ Convenções:
 - Valores monetários como números JSON, nunca strings formatadas.
 - Moeda inicial `EUR`.
 - Enums são serializados como números.
-- Todos os endpoints, exceto registo, OTP e health check, exigem Bearer token.
+- Todos os endpoints, exceto registo, OTP, consulta pública de convite e health check, exigem Bearer token.
 - Não existe prefixo de versão; os endpoints funcionais começam em `/api`.
 
 Headers habituais:
@@ -91,7 +92,9 @@ Resposta `201 Created`:
 }
 ```
 
-O registo cria automaticamente um agregado e associa o utilizador como `Owner`. Email e username duplicados devolvem `409`.
+`householdName` e `invitationCode` são opcionais e mutuamente exclusivos. Com `householdName`, o registo cria um agregado e associa o utilizador como `Owner`; com `invitationCode`, associa-o ao agregado e à role do convite; sem ambos, cria apenas a conta. Email e username duplicados devolvem `409`.
+
+O contrato completo do registo e dos convites está em [`household-invitations-frontend.md`](household-invitations-frontend.md).
 
 ### 4.2 Pedir OTP
 
