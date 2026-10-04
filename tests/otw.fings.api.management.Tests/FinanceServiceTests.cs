@@ -27,7 +27,7 @@ public sealed class FinanceServiceTests
             .Where(x => x.HouseholdId == result.Id)
             .ToListAsync();
         Assert.Equal(13, categories.Count);
-        Assert.Equal(86, categories.Sum(x => x.Subcategories.Count));
+        Assert.Equal(87, categories.Sum(x => x.Subcategories.Count));
         Assert.All(categories, category => Assert.NotEmpty(category.Subcategories));
         Assert.All(categories, category =>
             Assert.Contains(category.Subcategories, x => x.Name == "Não aplicável"));
@@ -39,6 +39,9 @@ public sealed class FinanceServiceTests
         Assert.Equal("#22C55E", food.Color);
         Assert.Equal("shopping-cart", food.Icon);
         Assert.Contains(food.Subcategories, x => x.Name == "Supermercado");
+
+        var housing = Assert.Single(categories, x => x.Name == "Habitação");
+        Assert.Contains(housing.Subcategories, x => x.Name == "Limpeza");
 
         var membership = await db.HouseholdMembers.SingleAsync(x => x.HouseholdId == result.Id);
         Assert.Equal(1, membership.UserId);

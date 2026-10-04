@@ -89,6 +89,7 @@ public sealed class OpenAiReceiptParser(
         # Exemplos de referência
         - Wells/farmácia + "AERO OM BBT 100ML" => Saúde e bem-estar / Farmácia.
         - Wells/farmácia + "ISDIN BEXIDENT", "BIODIA", "BEPANTHEN" => Saúde e bem-estar / Farmácia.
+        - "Empregada de limpeza" ou limpeza doméstica => Habitação / Limpeza.
         - "Cabo USB-C" ou "Carregador" => Compras pessoais / Eletrónica.
         """;
 

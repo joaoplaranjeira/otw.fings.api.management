@@ -14,7 +14,7 @@ public static class StandardCategoryCatalog
         new("Habitação", "#3B82F6", "house",
         [
             "Renda ou prestação", "Condomínio", "Eletricidade", "Água", "Gás", "Telecomunicações",
-            "Manutenção e reparações", "Mobiliário e equipamentos", "Seguro da habitação", "IMI"
+            "Manutenção e reparações", "Mobiliário e equipamentos", "Limpeza", "Seguro da habitação", "IMI"
         ]),
         new("Transportes", "#F59E0B", "car",
         [

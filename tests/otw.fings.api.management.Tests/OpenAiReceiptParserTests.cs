@@ -28,6 +28,7 @@ public sealed class OpenAiReceiptParserTests
         Assert.Contains("Educação", OpenAiReceiptParser.ClassificationInstructions);
         Assert.Contains("nunca são evidência", OpenAiReceiptParser.ClassificationInstructions);
         Assert.Contains("Não aplicável", OpenAiReceiptParser.ClassificationInstructions);
+        Assert.Contains("Empregada de limpeza", OpenAiReceiptParser.ClassificationInstructions);
     }
 
     [Fact]
