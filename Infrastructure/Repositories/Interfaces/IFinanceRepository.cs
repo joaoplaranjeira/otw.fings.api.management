@@ -30,6 +30,12 @@ public interface IFinanceRepository
     Task AddExpenseAsync(Expense expense, CancellationToken cancellationToken);
     Task<Expense?> GetExpenseAsync(Guid householdId, Guid expenseId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Expense>> GetExpensesAsync(Guid householdId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FrequentExpenseSuggestionResponse>> GetFrequentExpenseSuggestionsAsync(
+        Guid householdId,
+        DateOnly from,
+        DateOnly to,
+        int limit,
+        CancellationToken cancellationToken);
     Task AddRecurringExpenseAsync(RecurringExpense recurringExpense, CancellationToken cancellationToken);
     Task<RecurringExpense?> GetRecurringExpenseAsync(Guid householdId, Guid recurringExpenseId, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);

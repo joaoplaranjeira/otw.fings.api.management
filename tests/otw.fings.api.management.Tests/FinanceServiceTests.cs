@@ -668,6 +668,66 @@ public sealed class FinanceServiceTests
         Assert.Equal(2, await db.Expenses.CountAsync());
     }
 
+    [Fact]
+    public async Task GetFrequentExpenseSuggestions_ReturnsTopTenDistinctCombinationsFromLastThirtyDays()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var subcategory = new Subcategory { CategoryId = category.Id, Name = "Supermercado" };
+        db.Subcategories.Add(subcategory);
+        await db.SaveChangesAsync();
+
+        var today = new DateOnly(2027, 1, 30);
+        Expense CreateExpense(
+            string? merchantName,
+            DateOnly date,
+            FinancialRecordStatus status = FinancialRecordStatus.Confirmed) => new()
+        {
+            HouseholdId = household.Id,
+            CategoryId = category.Id,
+            SubcategoryId = subcategory.Id,
+            Date = date,
+            Amount = 10m,
+            Description = "Compra",
+            MerchantName = merchantName,
+            MerchantTaxNumber = "500000000",
+            Status = status
+        };
+
+        db.Expenses.AddRange(
+            CreateExpense("Mercado Alfa", today.AddDays(-1)),
+            CreateExpense("Mercado Alfa", today.AddDays(-2)),
+            CreateExpense("Mercado Alfa", today.AddDays(-3)),
+            CreateExpense("Mercado Beta", today.AddDays(-1)),
+            CreateExpense("Mercado Beta", today.AddDays(-2)),
+            CreateExpense("Mercado Beta", today, FinancialRecordStatus.Cancelled),
+            CreateExpense("Antigo", today.AddDays(-30)),
+            CreateExpense("Futuro", today.AddDays(1)),
+            CreateExpense(null, today));
+        db.Expenses.AddRange(Enumerable.Range(0, 9)
+            .Select(index => CreateExpense($"Loja {index:00}", today.AddDays(-5))));
+        await db.SaveChangesAsync();
+
+        var repository = new FinanceRepository(db);
+        var clock = new FixedTimeProvider(new DateTimeOffset(2027, 1, 30, 12, 0, 0, TimeSpan.Zero));
+        var service = new FinanceService(repository, timeProvider: clock);
+
+        var result = await service.GetFrequentExpenseSuggestionsAsync(
+            household.Id,
+            1,
+            CancellationToken.None);
+
+        Assert.Equal(10, result.Count);
+        Assert.Equal("Mercado Alfa", result[0].MerchantName);
+        Assert.Equal(3, result[0].OccurrenceCount);
+        Assert.Equal(today.AddDays(-1), result[0].LastOccurrenceDate);
+        Assert.Equal(category.Id, result[0].CategoryId);
+        Assert.Equal(subcategory.Id, result[0].SubcategoryId);
+        Assert.Equal("Mercado Beta", result[1].MerchantName);
+        Assert.Equal(2, result[1].OccurrenceCount);
+        Assert.DoesNotContain(result, x => x.MerchantName is "Antigo" or "Futuro" or "Loja 08");
+    }
+
     private static DateOnly TodayInLisbon()
     {
         var lisbon = TimeZoneInfo.FindSystemTimeZoneById("Europe/Lisbon");
@@ -711,4 +771,9 @@ public sealed class FinanceServiceTests
         InsertedDate = DateTime.UtcNow,
         UpdatedDate = DateTime.UtcNow
     };
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
 }

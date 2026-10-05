@@ -17,6 +17,7 @@
 - `GET/POST /api/households/{householdId}/budgets`
 - `GET /api/households/{householdId}/incomes?from=YYYY-MM-DD&to=YYYY-MM-DD`
 - `GET/POST /api/households/{householdId}/expenses` — cada despesa é um movimento total com uma ou mais parcelas em `lines`; na ausência de `lines`, é criada uma parcela automaticamente.
+- `GET /api/households/{householdId}/expenses/suggestions` — devolve as 10 combinações de comerciante, NIF, categoria e subcategoria mais frequentes entre hoje e os 29 dias anteriores; exclui despesas canceladas e registos sem comerciante.
 - `PATCH /api/households/{householdId}/expenses/{expenseId}` — edita o movimento e, opcionalmente, substitui as parcelas na mesma operação.
 - `PUT /api/households/{householdId}/expenses/{expenseId}/lines` — substitui todas as parcelas, mantendo o total atual.
 - `GET/POST /api/households/{householdId}/recurring-expenses`

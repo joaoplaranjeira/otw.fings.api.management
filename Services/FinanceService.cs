@@ -6,10 +6,12 @@ namespace otw.fings.api.management.Services;
 
 public sealed class FinanceService(
     IFinanceRepository repository,
-    IRecurringExpenseMaterializer? materializer = null) : IFinanceService
+    IRecurringExpenseMaterializer? materializer = null,
+    TimeProvider? timeProvider = null) : IFinanceService
 {
     private readonly IRecurringExpenseMaterializer recurringExpenseMaterializer =
         materializer ?? new RecurringExpenseMaterializer(repository);
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
 
     public Task<IReadOnlyList<HouseholdResponse>> GetHouseholdsAsync(long userId, CancellationToken cancellationToken) =>
         repository.GetHouseholdsAsync(userId, cancellationToken);
@@ -523,6 +525,22 @@ public sealed class FinanceService(
         return (await repository.GetExpensesAsync(householdId, from, to, cancellationToken)).Select(Map).ToArray();
     }
 
+    public async Task<IReadOnlyList<FrequentExpenseSuggestionResponse>> GetFrequentExpenseSuggestionsAsync(
+        Guid householdId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, false, cancellationToken);
+        var to = TodayInLisbon();
+        var from = to.AddDays(-29);
+        return await repository.GetFrequentExpenseSuggestionsAsync(
+            householdId,
+            from,
+            to,
+            10,
+            cancellationToken);
+    }
+
     public async Task<BudgetDashboardResponse> GetDashboardAsync(
         Guid householdId,
         long userId,
@@ -724,10 +742,10 @@ public sealed class FinanceService(
         expense.MerchantName, expense.MerchantTaxNumber, expense.Amount, expense.Frequency,
         expense.StartDate, expense.EndDate, expense.NextOccurrenceDate, expense.IsActive);
 
-    private static DateOnly TodayInLisbon()
+    private DateOnly TodayInLisbon()
     {
         var lisbon = TimeZoneInfo.FindSystemTimeZoneById("Europe/Lisbon");
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, lisbon).DateTime);
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), lisbon).DateTime);
     }
 
     private async Task<List<(CreateExpenseLineRequest Request, Category Category, Subcategory? Subcategory)>> ResolveLinesAsync(

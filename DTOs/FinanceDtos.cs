@@ -136,6 +136,16 @@ public sealed record ExpenseResponse(
     FinancialRecordStatus Status,
     IReadOnlyList<ExpenseLineResponse> Lines);
 
+public sealed record FrequentExpenseSuggestionResponse(
+    string MerchantName,
+    string? MerchantTaxNumber,
+    Guid CategoryId,
+    string CategoryName,
+    Guid? SubcategoryId,
+    string? SubcategoryName,
+    int OccurrenceCount,
+    DateOnly LastOccurrenceDate);
+
 public sealed record CreateRecurringExpenseRequest(
     Guid CategoryId,
     Guid? SubcategoryId,

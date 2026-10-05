@@ -18,6 +18,12 @@ public sealed class ExpensesController(IFinanceService service, ICurrentUserCont
         CancellationToken cancellationToken) =>
         Ok(await service.GetExpensesAsync(householdId, currentUser.UserId, from, to, cancellationToken));
 
+    [HttpGet("suggestions")]
+    public async Task<ActionResult<IReadOnlyList<FrequentExpenseSuggestionResponse>>> GetSuggestions(
+        Guid householdId,
+        CancellationToken cancellationToken) =>
+        Ok(await service.GetFrequentExpenseSuggestionsAsync(householdId, currentUser.UserId, cancellationToken));
+
     [HttpPost]
     public async Task<ActionResult<ExpenseResponse>> Create(
         Guid householdId,

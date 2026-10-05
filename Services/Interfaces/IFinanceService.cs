@@ -20,6 +20,7 @@ public interface IFinanceService
     Task<ExpenseResponse> UpdateExpenseAsync(Guid householdId, Guid expenseId, long userId, UpdateExpenseRequest request, CancellationToken cancellationToken);
     Task<ExpenseResponse> ReplaceExpenseLinesAsync(Guid householdId, Guid expenseId, long userId, ReplaceExpenseLinesRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExpenseResponse>> GetExpensesAsync(Guid householdId, long userId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FrequentExpenseSuggestionResponse>> GetFrequentExpenseSuggestionsAsync(Guid householdId, long userId, CancellationToken cancellationToken);
     Task<BudgetDashboardResponse> GetDashboardAsync(Guid householdId, long userId, DateOnly month, CancellationToken cancellationToken);
     Task<RecurringExpenseResponse> CreateRecurringExpenseAsync(Guid householdId, long userId, CreateRecurringExpenseRequest request, CancellationToken cancellationToken);
     Task<RecurringExpenseResponse> UpdateRecurringExpenseAsync(Guid householdId, Guid recurringExpenseId, long userId, UpdateRecurringExpenseRequest request, CancellationToken cancellationToken);

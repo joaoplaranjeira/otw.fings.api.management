@@ -175,6 +175,52 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
             .OrderByDescending(x => x.Date).ThenByDescending(x => x.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<FrequentExpenseSuggestionResponse>> GetFrequentExpenseSuggestionsAsync(
+        Guid householdId,
+        DateOnly from,
+        DateOnly to,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var groups = await dbContext.Expenses.AsNoTracking()
+            .Where(x =>
+                x.HouseholdId == householdId &&
+                x.Date >= from &&
+                x.Date <= to &&
+                x.Status != FinancialRecordStatus.Cancelled &&
+                x.MerchantName != null)
+            .GroupBy(x => new
+            {
+                MerchantName = x.MerchantName!,
+                x.MerchantTaxNumber,
+                x.CategoryId,
+                CategoryName = x.Category.Name,
+                x.SubcategoryId,
+                SubcategoryName = x.Subcategory != null ? x.Subcategory.Name : null
+            })
+            .Select(group => new
+            {
+                group.Key,
+                OccurrenceCount = group.Count(),
+                LastOccurrenceDate = group.Max(x => x.Date)
+            })
+            .OrderByDescending(x => x.OccurrenceCount)
+            .ThenByDescending(x => x.LastOccurrenceDate)
+            .ThenBy(x => x.Key.MerchantName)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return groups.Select(group => new FrequentExpenseSuggestionResponse(
+            group.Key.MerchantName,
+            group.Key.MerchantTaxNumber,
+            group.Key.CategoryId,
+            group.Key.CategoryName,
+            group.Key.SubcategoryId,
+            group.Key.SubcategoryName,
+            group.OccurrenceCount,
+            group.LastOccurrenceDate)).ToArray();
+    }
+
     public async Task AddRecurringExpenseAsync(RecurringExpense recurringExpense, CancellationToken cancellationToken)
     {
         dbContext.RecurringExpenses.Add(recurringExpense);
