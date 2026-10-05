@@ -68,6 +68,8 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
 
         modelBuilder.Entity<HouseholdMember>(entity =>
         {
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.BirthDate).HasConversion(NullableDateOnlyConverter).HasColumnType("date");
             entity.HasIndex(x => new { x.HouseholdId, x.UserId }).IsUnique();
             entity.HasOne(x => x.Household).WithMany(x => x.Members)
                 .HasForeignKey(x => x.HouseholdId).OnDelete(DeleteBehavior.Cascade);

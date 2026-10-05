@@ -1,5 +1,7 @@
 # Integração frontend — membros dos agregados familiares
 
+> Este contrato foi expandido para suportar elementos sem utilizador, grau familiar, data de nascimento e edição. Consultar [household-composition-frontend.md](household-composition-frontend.md) para a versão atual.
+
 Este documento descreve o contrato da API para listar os tipos de membro e gerir os utilizadores associados a um agregado familiar.
 
 ## Autenticação e formato

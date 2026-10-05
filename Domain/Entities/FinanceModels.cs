@@ -12,10 +12,13 @@ public sealed class Household : Entity
 public sealed class HouseholdMember : Entity
 {
     public Guid HouseholdId { get; set; }
-    public long UserId { get; set; }
-    public HouseholdRole Role { get; set; }
+    public long? UserId { get; set; }
+    public string? Name { get; set; }
+    public HouseholdRole? Role { get; set; }
+    public HouseholdRelationship? Relationship { get; set; }
+    public DateOnly? BirthDate { get; set; }
     public Household Household { get; set; } = null!;
-    public User User { get; set; } = null!;
+    public User? User { get; set; }
 }
 
 public sealed class HouseholdInvitation : Entity

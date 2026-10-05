@@ -5,8 +5,10 @@ public interface IFinanceService
     Task<IReadOnlyList<HouseholdResponse>> GetHouseholdsAsync(long userId, CancellationToken cancellationToken);
     Task<HouseholdResponse> CreateHouseholdAsync(long userId, CreateHouseholdRequest request, CancellationToken cancellationToken);
     IReadOnlyList<HouseholdRoleResponse> GetHouseholdRoles();
+    IReadOnlyList<HouseholdRelationshipResponse> GetHouseholdRelationships();
     Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(Guid householdId, long userId, CancellationToken cancellationToken);
     Task<HouseholdMemberResponse> AddHouseholdMemberAsync(Guid householdId, long userId, AddHouseholdMemberRequest request, CancellationToken cancellationToken);
+    Task<HouseholdMemberResponse> UpdateHouseholdMemberAsync(Guid householdId, Guid memberId, long userId, UpdateHouseholdMemberRequest request, CancellationToken cancellationToken);
     Task RemoveHouseholdMemberAsync(Guid householdId, Guid memberId, long userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(Guid householdId, long userId, CancellationToken cancellationToken);
     Task<CategoryResponse> CreateCategoryAsync(Guid householdId, long userId, CreateCategoryRequest request, CancellationToken cancellationToken);

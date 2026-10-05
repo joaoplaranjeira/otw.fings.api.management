@@ -10,19 +10,31 @@ public sealed record CreateHouseholdRequest(
     [MaxLength(100)] string TimeZone = "Europe/Lisbon");
 
 public sealed record AddHouseholdMemberRequest(
-    [Required, EmailAddress, MaxLength(255)] string Email,
-    HouseholdRole Role);
+    [EmailAddress, MaxLength(255)] string? Email,
+    HouseholdRole? Role,
+    [MaxLength(200)] string? Name = null,
+    HouseholdRelationship? Relationship = null,
+    DateOnly? BirthDate = null);
+
+public sealed record UpdateHouseholdMemberRequest(
+    [Required, MaxLength(200)] string Name,
+    HouseholdRelationship Relationship,
+    DateOnly BirthDate,
+    HouseholdRole? Role = null);
 
 public sealed record HouseholdMemberResponse(
     Guid Id,
-    long UserId,
+    long? UserId,
     string Name,
-    string Username,
-    string Email,
-    bool IsActive,
-    HouseholdRole Role);
+    string? Username,
+    string? Email,
+    bool? IsActive,
+    HouseholdRole? Role,
+    HouseholdRelationship? Relationship = null,
+    DateOnly? BirthDate = null);
 
 public sealed record HouseholdRoleResponse(HouseholdRole Value, string Name);
+public sealed record HouseholdRelationshipResponse(HouseholdRelationship Value, string Name);
 
 public sealed record CategoryResponse(
     Guid Id,

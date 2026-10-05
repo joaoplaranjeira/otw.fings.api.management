@@ -8,6 +8,28 @@ public enum HouseholdRole
     Viewer = 4
 }
 
+public enum HouseholdRelationship
+{
+    Self = 1,
+    Husband = 2,
+    Wife = 3,
+    Partner = 4,
+    Son = 5,
+    Daughter = 6,
+    Child = 7,
+    Father = 8,
+    Mother = 9,
+    Parent = 10,
+    Brother = 11,
+    Sister = 12,
+    Sibling = 13,
+    Grandfather = 14,
+    Grandmother = 15,
+    Grandparent = 16,
+    OtherRelative = 17,
+    Other = 18
+}
+
 public enum HouseholdInvitationStatus
 {
     Pending = 1,

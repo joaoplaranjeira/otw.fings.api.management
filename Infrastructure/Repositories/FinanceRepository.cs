@@ -19,7 +19,7 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
         await dbContext.HouseholdMembers.AsNoTracking()
             .Where(x => x.UserId == userId)
             .OrderBy(x => x.Household.Name)
-            .Select(x => new HouseholdResponse(x.HouseholdId, x.Household.Name, x.Household.Currency, x.Household.TimeZone, x.Role))
+            .Select(x => new HouseholdResponse(x.HouseholdId, x.Household.Name, x.Household.Currency, x.Household.TimeZone, x.Role!.Value))
             .ToListAsync(cancellationToken);
 
     public async Task AddHouseholdAsync(
@@ -40,15 +40,17 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
         await dbContext.HouseholdMembers.AsNoTracking()
             .Where(x => x.HouseholdId == householdId)
             .OrderBy(x => x.Role)
-            .ThenBy(x => x.User.Name)
+            .ThenBy(x => x.Name ?? x.User!.Name)
             .Select(x => new HouseholdMemberResponse(
                 x.Id,
                 x.UserId,
-                x.User.Name,
-                x.User.Username,
-                x.User.Email,
-                x.User.IsActive,
-                x.Role))
+                x.Name ?? x.User!.Name,
+                x.UserId == null ? null : x.User!.Username,
+                x.UserId == null ? null : x.User!.Email,
+                x.UserId == null ? null : x.User!.IsActive,
+                x.Role,
+                x.Relationship,
+                x.BirthDate))
             .ToListAsync(cancellationToken);
 
     public Task<HouseholdMember?> GetHouseholdMemberAsync(
@@ -81,6 +83,9 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
         dbContext.HouseholdMembers.Add(member);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task SaveHouseholdMemberAsync(CancellationToken cancellationToken) =>
+        await dbContext.SaveChangesAsync(cancellationToken);
 
     public async Task RemoveHouseholdMemberAsync(HouseholdMember member, CancellationToken cancellationToken)
     {

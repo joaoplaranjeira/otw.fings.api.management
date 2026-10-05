@@ -60,7 +60,7 @@ public sealed class FinanceServiceTests
         var added = await service.AddHouseholdMemberAsync(
             household.Id,
             1,
-            new(" MARIA@example.com ", HouseholdRole.Member),
+            new(" MARIA@example.com ", HouseholdRole.Member, "Maria", HouseholdRelationship.Wife, new DateOnly(1990, 4, 12)),
             CancellationToken.None);
         var members = await service.GetHouseholdMembersAsync(household.Id, 1, CancellationToken.None);
 
@@ -80,12 +80,12 @@ public sealed class FinanceServiceTests
         await Assert.ThrowsAsync<ConflictException>(() => service.AddHouseholdMemberAsync(
             household.Id,
             1,
-            new("owner@example.com", HouseholdRole.Member),
+            new("owner@example.com", HouseholdRole.Member, "Owner", HouseholdRelationship.OtherRelative, new DateOnly(1980, 1, 1)),
             CancellationToken.None));
         await Assert.ThrowsAsync<NotFoundException>(() => service.AddHouseholdMemberAsync(
             household.Id,
             1,
-            new("unknown@example.com", HouseholdRole.Member),
+            new("unknown@example.com", HouseholdRole.Member, "Desconhecido", HouseholdRelationship.OtherRelative, new DateOnly(1980, 1, 1)),
             CancellationToken.None));
     }
 
@@ -111,14 +111,14 @@ public sealed class FinanceServiceTests
         var added = await service.AddHouseholdMemberAsync(
             household.Id,
             administrator.Id,
-            new(target.Email, HouseholdRole.Viewer),
+            new(target.Email, HouseholdRole.Viewer, "Membro", HouseholdRelationship.OtherRelative, new DateOnly(1990, 1, 1)),
             CancellationToken.None);
 
         Assert.Equal(HouseholdRole.Viewer, added.Role);
         await Assert.ThrowsAsync<ForbiddenException>(() => service.AddHouseholdMemberAsync(
             household.Id,
             administrator.Id,
-            new("owner@example.com", HouseholdRole.Owner),
+            new("owner@example.com", HouseholdRole.Owner, "Owner", HouseholdRelationship.OtherRelative, new DateOnly(1980, 1, 1)),
             CancellationToken.None));
     }
 
@@ -144,7 +144,7 @@ public sealed class FinanceServiceTests
         await Assert.ThrowsAsync<ForbiddenException>(() => service.AddHouseholdMemberAsync(
             household.Id,
             member.Id,
-            new(target.Email, HouseholdRole.Member),
+            new(target.Email, HouseholdRole.Member, "Novo membro", HouseholdRelationship.OtherRelative, new DateOnly(1990, 1, 1)),
             CancellationToken.None));
     }
 
@@ -189,6 +189,95 @@ public sealed class FinanceServiceTests
 
         Assert.Equal(Enum.GetValues<HouseholdRole>(), roles.Select(x => x.Value));
         Assert.Equal(["Owner", "Administrator", "Member", "Viewer"], roles.Select(x => x.Name));
+    }
+
+    [Fact]
+    public async Task AddHouseholdMember_AddsElementWithoutUser()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var added = await service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new(null, null, "Tomás", HouseholdRelationship.Son, new DateOnly(2018, 7, 9)),
+            CancellationToken.None);
+
+        Assert.Null(added.UserId);
+        Assert.Null(added.Role);
+        Assert.Equal("Tomás", added.Name);
+        Assert.Equal(HouseholdRelationship.Son, added.Relationship);
+        Assert.Equal(new DateOnly(2018, 7, 9), added.BirthDate);
+        Assert.Null(added.Email);
+    }
+
+    [Fact]
+    public async Task UpdateHouseholdMember_UpdatesPersonalDetailsAndKeepsAccessRole()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var member = await db.HouseholdMembers.SingleAsync(x => x.UserId == 1);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var updated = await service.UpdateHouseholdMemberAsync(
+            household.Id,
+            member.Id,
+            1,
+            new("João", HouseholdRelationship.Self, new DateOnly(1988, 2, 3)),
+            CancellationToken.None);
+
+        Assert.Equal("João", updated.Name);
+        Assert.Equal(HouseholdRelationship.Self, updated.Relationship);
+        Assert.Equal(new DateOnly(1988, 2, 3), updated.BirthDate);
+        Assert.Equal(HouseholdRole.Owner, updated.Role);
+    }
+
+    [Fact]
+    public async Task AddHouseholdMember_RejectsMissingDetailsAndFutureBirthDate()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new(null, null, " ", HouseholdRelationship.Child, new DateOnly(2018, 1, 1)),
+            CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() => service.AddHouseholdMemberAsync(
+            household.Id,
+            1,
+            new(null, null, "Futuro", HouseholdRelationship.Child, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1)),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateHouseholdMember_DoesNotDemoteOnlyOwner()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var member = await db.HouseholdMembers.SingleAsync(x => x.UserId == 1);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<ConflictException>(() => service.UpdateHouseholdMemberAsync(
+            household.Id,
+            member.Id,
+            1,
+            new("Owner", HouseholdRelationship.Self, new DateOnly(1980, 1, 1), HouseholdRole.Member),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public void HouseholdRelationships_ReturnsLocalizedCatalog()
+    {
+        var service = new FinanceService(null!);
+
+        var relationships = service.GetHouseholdRelationships();
+
+        Assert.Equal(Enum.GetValues<HouseholdRelationship>(), relationships.Select(x => x.Value));
+        Assert.Contains(relationships, x => x.Value == HouseholdRelationship.Wife && x.Name == "Esposa");
+        Assert.Contains(relationships, x => x.Value == HouseholdRelationship.OtherRelative && x.Name == "Outro familiar");
     }
 
     [Fact]

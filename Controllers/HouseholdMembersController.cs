@@ -39,4 +39,17 @@ public sealed class HouseholdMembersController(IFinanceService service, ICurrent
         await service.RemoveHouseholdMemberAsync(householdId, memberId, currentUser.UserId, cancellationToken);
         return NoContent();
     }
+
+    [HttpPut("{memberId:guid}")]
+    public async Task<ActionResult<HouseholdMemberResponse>> Update(
+        Guid householdId,
+        Guid memberId,
+        UpdateHouseholdMemberRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await service.UpdateHouseholdMemberAsync(
+            householdId,
+            memberId,
+            currentUser.UserId,
+            request,
+            cancellationToken));
 }

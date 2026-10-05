@@ -35,12 +35,17 @@ public sealed class FinanceService(
         };
         var categories = StandardCategoryCatalog.CreateFor(household.Id);
         await repository.AddHouseholdAsync(household, membership, categories, cancellationToken);
-        return new(household.Id, household.Name, household.Currency, household.TimeZone, membership.Role);
+        return new(household.Id, household.Name, household.Currency, household.TimeZone, membership.Role!.Value);
     }
 
     public IReadOnlyList<HouseholdRoleResponse> GetHouseholdRoles() =>
         Enum.GetValues<HouseholdRole>()
             .Select(role => new HouseholdRoleResponse(role, role.ToString()))
+            .ToArray();
+
+    public IReadOnlyList<HouseholdRelationshipResponse> GetHouseholdRelationships() =>
+        Enum.GetValues<HouseholdRelationship>()
+            .Select(relationship => new HouseholdRelationshipResponse(relationship, RelationshipName(relationship)))
             .ToArray();
 
     public async Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(
@@ -59,7 +64,8 @@ public sealed class FinanceService(
         CancellationToken cancellationToken)
     {
         var requesterRole = await EnsureCanManageMembersAsync(householdId, userId, cancellationToken);
-        if (!Enum.IsDefined(request.Role))
+        ValidatePersonalDetails(request.Name, request.Relationship, request.BirthDate);
+        if (request.Role.HasValue && !Enum.IsDefined(request.Role.Value))
         {
             throw new ValidationException("O papel indicado não é válido.");
         }
@@ -69,22 +75,86 @@ public sealed class FinanceService(
             throw new ForbiddenException("Um administrador só pode adicionar membros com os papéis Member ou Viewer.");
         }
 
-        var email = request.Email.Trim().ToLowerInvariant();
-        var user = await repository.GetActiveUserByEmailAsync(email, cancellationToken)
-            ?? throw new NotFoundException("Não existe um utilizador ativo com este email.");
-        if (await repository.HasHouseholdMemberAsync(householdId, user.Id, cancellationToken))
+        User? linkedUser = null;
+        if (!string.IsNullOrWhiteSpace(request.Email))
         {
-            throw new ConflictException("O utilizador já pertence a este agregado.");
+            if (!request.Role.HasValue)
+            {
+                throw new ValidationException("Indique o papel de acesso do utilizador.");
+            }
+            var email = request.Email.Trim().ToLowerInvariant();
+            linkedUser = await repository.GetActiveUserByEmailAsync(email, cancellationToken)
+                ?? throw new NotFoundException("Não existe um utilizador ativo com este email.");
+            if (await repository.HasHouseholdMemberAsync(householdId, linkedUser.Id, cancellationToken))
+            {
+                throw new ConflictException("O utilizador já pertence a este agregado.");
+            }
+        }
+        else if (request.Role.HasValue)
+        {
+            throw new ValidationException("Um elemento sem utilizador não pode ter um papel de acesso.");
         }
 
         var member = new HouseholdMember
         {
             HouseholdId = householdId,
-            UserId = user.Id,
-            Role = request.Role
+            UserId = linkedUser?.Id,
+            Name = request.Name!.Trim(),
+            Role = request.Role,
+            Relationship = request.Relationship,
+            BirthDate = request.BirthDate
         };
         await repository.AddHouseholdMemberAsync(member, cancellationToken);
-        return new(member.Id, user.Id, user.Name, user.Username, user.Email, user.IsActive, member.Role);
+        return Map(member, linkedUser);
+    }
+
+    public async Task<HouseholdMemberResponse> UpdateHouseholdMemberAsync(
+        Guid householdId,
+        Guid memberId,
+        long userId,
+        UpdateHouseholdMemberRequest request,
+        CancellationToken cancellationToken)
+    {
+        var requesterRole = await EnsureCanManageMembersAsync(householdId, userId, cancellationToken);
+        ValidatePersonalDetails(request.Name, request.Relationship, request.BirthDate);
+        var member = await repository.GetHouseholdMemberAsync(householdId, memberId, cancellationToken)
+            ?? throw new NotFoundException("Membro não encontrado.");
+
+        if (requesterRole == HouseholdRole.Administrator &&
+            member.Role is HouseholdRole.Owner or HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("Um administrador não pode editar owners ou outros administradores.");
+        }
+        if (request.Role.HasValue && !Enum.IsDefined(request.Role.Value))
+        {
+            throw new ValidationException("O papel indicado não é válido.");
+        }
+        if (requesterRole == HouseholdRole.Administrator &&
+            request.Role is HouseholdRole.Owner or HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("Um administrador só pode atribuir os papéis Member ou Viewer.");
+        }
+        if (member.UserId is null && request.Role.HasValue)
+        {
+            throw new ValidationException("Um elemento sem utilizador não pode ter um papel de acesso.");
+        }
+        if (member.Role == HouseholdRole.Owner &&
+            request.Role.HasValue &&
+            request.Role.Value != HouseholdRole.Owner &&
+            await repository.CountHouseholdOwnersAsync(householdId, cancellationToken) <= 1)
+        {
+            throw new ConflictException("Não é possível alterar o papel do único owner do agregado.");
+        }
+
+        member.Name = request.Name.Trim();
+        member.Relationship = request.Relationship;
+        member.BirthDate = request.BirthDate;
+        if (request.Role.HasValue)
+        {
+            member.Role = request.Role.Value;
+        }
+        await repository.SaveHouseholdMemberAsync(cancellationToken);
+        return Map(member, member.User);
     }
 
     public async Task RemoveHouseholdMemberAsync(
@@ -113,6 +183,63 @@ public sealed class FinanceService(
 
         await repository.RemoveHouseholdMemberAsync(member, cancellationToken);
     }
+
+    private static void ValidatePersonalDetails(
+        string? name,
+        HouseholdRelationship? relationship,
+        DateOnly? birthDate)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ValidationException("O nome do elemento é obrigatório.");
+        }
+        if (!relationship.HasValue || !Enum.IsDefined(relationship.Value))
+        {
+            throw new ValidationException("O grau familiar indicado não é válido.");
+        }
+        if (!birthDate.HasValue)
+        {
+            throw new ValidationException("A data de nascimento é obrigatória.");
+        }
+        if (birthDate.Value > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ValidationException("A data de nascimento não pode estar no futuro.");
+        }
+    }
+
+    private static HouseholdMemberResponse Map(HouseholdMember member, User? user) => new(
+        member.Id,
+        member.UserId,
+        member.Name ?? user?.Name ?? string.Empty,
+        user?.Username,
+        user?.Email,
+        user?.IsActive,
+        member.Role,
+        member.Relationship,
+        member.BirthDate);
+
+    private static string RelationshipName(HouseholdRelationship relationship) => relationship switch
+    {
+        HouseholdRelationship.Self => "Próprio/a",
+        HouseholdRelationship.Husband => "Marido",
+        HouseholdRelationship.Wife => "Esposa",
+        HouseholdRelationship.Partner => "Companheiro/a",
+        HouseholdRelationship.Son => "Filho",
+        HouseholdRelationship.Daughter => "Filha",
+        HouseholdRelationship.Child => "Filho/a",
+        HouseholdRelationship.Father => "Pai",
+        HouseholdRelationship.Mother => "Mãe",
+        HouseholdRelationship.Parent => "Progenitor/a",
+        HouseholdRelationship.Brother => "Irmão",
+        HouseholdRelationship.Sister => "Irmã",
+        HouseholdRelationship.Sibling => "Irmão/irmã",
+        HouseholdRelationship.Grandfather => "Avô",
+        HouseholdRelationship.Grandmother => "Avó",
+        HouseholdRelationship.Grandparent => "Avô/avó",
+        HouseholdRelationship.OtherRelative => "Outro familiar",
+        HouseholdRelationship.Other => "Outro",
+        _ => relationship.ToString()
+    };
 
     public async Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(
         Guid householdId,
