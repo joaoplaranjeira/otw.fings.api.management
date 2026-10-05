@@ -719,6 +719,7 @@ public sealed class FinanceServiceTests
 
         Assert.Equal(10, result.Count);
         Assert.Equal("Mercado Alfa", result[0].MerchantName);
+        Assert.Equal("Compra", result[0].Description);
         Assert.Equal(3, result[0].OccurrenceCount);
         Assert.Equal(today.AddDays(-1), result[0].LastOccurrenceDate);
         Assert.Equal(category.Id, result[0].CategoryId);

@@ -137,6 +137,7 @@ public sealed record ExpenseResponse(
     IReadOnlyList<ExpenseLineResponse> Lines);
 
 public sealed record FrequentExpenseSuggestionResponse(
+    string Description,
     string MerchantName,
     string? MerchantTaxNumber,
     Guid CategoryId,

@@ -191,6 +191,7 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
                 x.MerchantName != null)
             .GroupBy(x => new
             {
+                x.Description,
                 MerchantName = x.MerchantName!,
                 x.MerchantTaxNumber,
                 x.CategoryId,
@@ -211,6 +212,7 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
             .ToListAsync(cancellationToken);
 
         return groups.Select(group => new FrequentExpenseSuggestionResponse(
+            group.Key.Description,
             group.Key.MerchantName,
             group.Key.MerchantTaxNumber,
             group.Key.CategoryId,
