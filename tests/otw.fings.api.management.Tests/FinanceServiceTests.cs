@@ -608,6 +608,107 @@ public sealed class FinanceServiceTests
     }
 
     [Fact]
+    public async Task DeleteExpense_CancelsExpenseAndExcludesItFromQueries()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+        var created = await service.CreateExpenseAsync(
+            household.Id,
+            1,
+            new(category.Id, null, new(2027, 1, 5), 20m, "Compra", "Loja", null),
+            CancellationToken.None);
+
+        await service.DeleteExpenseAsync(household.Id, created.Id, 1, CancellationToken.None);
+
+        var expense = await db.Expenses.SingleAsync(x => x.Id == created.Id);
+        Assert.Equal(1, expense.CreatedByUserId);
+        Assert.Equal(FinancialRecordStatus.Cancelled, expense.Status);
+        Assert.Single(await db.ExpenseLines.Where(x => x.ExpenseId == created.Id).ToListAsync());
+        Assert.Empty(await service.GetExpensesAsync(
+            household.Id,
+            1,
+            new DateOnly(2027, 1, 1),
+            new DateOnly(2027, 1, 31),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeleteExpense_OwnerCanDeleteAnyExpenseAndAdministratorOnlyTheirOwn()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var administrator = CreateUser(2, "Admin", "admin", "admin@example.com");
+        db.AddRange(
+            administrator,
+            new HouseholdMember
+            {
+                HouseholdId = household.Id,
+                UserId = administrator.Id,
+                Role = HouseholdRole.Administrator
+            });
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+        var ownerExpense = await service.CreateExpenseAsync(
+            household.Id, 1,
+            new(category.Id, null, new(2027, 1, 5), 20m, "Despesa do owner", null, null),
+            CancellationToken.None);
+        var administratorExpense = await service.CreateExpenseAsync(
+            household.Id, administrator.Id,
+            new(category.Id, null, new(2027, 1, 6), 30m, "Despesa do administrador", null, null),
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.DeleteExpenseAsync(
+            household.Id, ownerExpense.Id, administrator.Id, CancellationToken.None));
+        await service.DeleteExpenseAsync(
+            household.Id, administratorExpense.Id, administrator.Id, CancellationToken.None);
+        await service.DeleteExpenseAsync(
+            household.Id, ownerExpense.Id, 1, CancellationToken.None);
+
+        Assert.All(await db.Expenses.ToListAsync(),
+            expense => Assert.Equal(FinancialRecordStatus.Cancelled, expense.Status));
+    }
+
+    [Fact]
+    public async Task DeleteExpense_RejectsMember()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var member = CreateUser(2, "Membro", "member", "member@example.com");
+        db.AddRange(
+            member,
+            new HouseholdMember
+            {
+                HouseholdId = household.Id,
+                UserId = member.Id,
+                Role = HouseholdRole.Member
+            });
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+        var expense = await service.CreateExpenseAsync(
+            household.Id, member.Id,
+            new(category.Id, null, new(2027, 1, 5), 20m, "Despesa do membro", null, null),
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => service.DeleteExpenseAsync(
+            household.Id, expense.Id, member.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeleteExpense_RejectsUnknownExpense()
+    {
+        await using var db = CreateDbContext();
+        var (household, _) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<NotFoundException>(() => service.DeleteExpenseAsync(
+            household.Id,
+            Guid.NewGuid(),
+            1,
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task UpdateCategoryAndSubcategory_ChangesTheirConfiguration()
     {
         await using var db = CreateDbContext();

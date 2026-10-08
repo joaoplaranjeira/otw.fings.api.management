@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using otw.fings.api.management.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using otw.fings.api.management.Infrastructure.Data;
 namespace otw.fings.api.management.Migrations
 {
     [DbContext(typeof(FingsDbContext))]
-    partial class FingsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007114759_AddGenericNotifications")]
+    partial class AddGenericNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -757,54 +760,6 @@ namespace otw.fings.api.management.Migrations
                             RecipientPolicy = "HouseholdMembersExceptActor",
                             Scope = "System",
                             TemplateKey = "expense-created"
-                        },
-                        new
-                        {
-                            Id = new Guid("20000000-0000-0000-0000-000000000002"),
-                            ChannelsJson = "[\"WebPush\",\"InApp\"]",
-                            ConditionJson = "{\"thresholdPercentage\":80,\"direction\":\"up\"}",
-                            ConditionType = "BudgetThresholdCrossed",
-                            CooldownSeconds = 86400,
-                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 10, 7, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            EventType = "Budget.UsageChanged",
-                            IsEnabled = true,
-                            Name = "Orçamento a 80%",
-                            Priority = 100,
-                            RecipientPolicy = "AllHouseholdMembers",
-                            Scope = "System",
-                            TemplateKey = "budget-threshold-reached"
-                        },
-                        new
-                        {
-                            Id = new Guid("20000000-0000-0000-0000-000000000003"),
-                            ChannelsJson = "[\"WebPush\",\"InApp\"]",
-                            ConditionJson = "{\"thresholdPercentage\":100,\"direction\":\"up\"}",
-                            ConditionType = "BudgetThresholdCrossed",
-                            CooldownSeconds = 86400,
-                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 10, 7, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            EventType = "Budget.UsageChanged",
-                            IsEnabled = true,
-                            Name = "Orçamento a 100%",
-                            Priority = 100,
-                            RecipientPolicy = "AllHouseholdMembers",
-                            Scope = "System",
-                            TemplateKey = "budget-threshold-reached"
-                        },
-                        new
-                        {
-                            Id = new Guid("20000000-0000-0000-0000-000000000004"),
-                            ChannelsJson = "[\"WebPush\",\"InApp\"]",
-                            ConditionJson = "{\"thresholdPercentage\":50,\"direction\":\"up\"}",
-                            ConditionType = "BudgetThresholdCrossed",
-                            CooldownSeconds = 86400,
-                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 10, 7, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            EventType = "Budget.UsageChanged",
-                            IsEnabled = true,
-                            Name = "Orçamento a 50%",
-                            Priority = 100,
-                            RecipientPolicy = "AllHouseholdMembers",
-                            Scope = "System",
-                            TemplateKey = "budget-threshold-reached"
                         });
                 });
 

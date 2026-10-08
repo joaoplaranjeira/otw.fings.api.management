@@ -135,6 +135,7 @@ public sealed record ExpenseLineResponse(
 
 public sealed record ExpenseResponse(
     Guid Id,
+    long? CreatedByUserId,
     DateOnly Date,
     decimal Amount,
     string Description,

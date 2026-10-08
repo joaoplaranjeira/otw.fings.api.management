@@ -49,4 +49,14 @@ public sealed class ExpensesController(IFinanceService service, ICurrentUserCont
         ReplaceExpenseLinesRequest request,
         CancellationToken cancellationToken) =>
         Ok(await service.ReplaceExpenseLinesAsync(householdId, expenseId, currentUser.UserId, request, cancellationToken));
+
+    [HttpDelete("{expenseId:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid householdId,
+        Guid expenseId,
+        CancellationToken cancellationToken)
+    {
+        await service.DeleteExpenseAsync(householdId, expenseId, currentUser.UserId, cancellationToken);
+        return NoContent();
+    }
 }

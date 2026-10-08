@@ -31,6 +31,7 @@ public sealed class RecurringExpenseMaterializer(IFinanceRepository repository) 
                 var expense = new Expense
                 {
                     HouseholdId = rule.HouseholdId,
+                    CreatedByUserId = rule.CreatedByUserId,
                     CategoryId = rule.CategoryId,
                     SubcategoryId = rule.SubcategoryId,
                     Date = rule.NextOccurrenceDate,

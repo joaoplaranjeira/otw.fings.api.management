@@ -390,6 +390,7 @@ Origens: `1 = Manual`, `2 = Recurring`, `3 = Receipt`.
 [
   {
     "id": "12214a2d-42a4-4d20-a8d4-745db5d59db0",
+    "createdByUserId": 123,
     "date": "2027-01-08",
     "amount": 42.35,
     "description": "Compras semanais",
@@ -481,6 +482,17 @@ Substitui a lista completa, preservando o valor total e os restantes dados do mo
 ```
 
 Ambos os endpoints devolvem o movimento completo no mesmo formato da listagem.
+
+### Eliminar uma despesa
+
+`DELETE /api/households/{householdId}/expenses/{expenseId}`
+
+Desativa logicamente a despesa, preservando o movimento e as suas parcelas no histórico com o estado `Cancelled`. A despesa deixa de aparecer nas listagens e de contribuir para o dashboard. Em caso de sucesso, devolve `204 No Content`.
+
+- Um `Owner` pode eliminar qualquer despesa do agregado.
+- Um `Administrator` só pode eliminar despesas cujo `createdByUserId` corresponde ao seu utilizador.
+- `Member` e `Viewer` não podem eliminar despesas.
+- Despesas antigas sem autoria (`createdByUserId: null`) só podem ser eliminadas por um `Owner`.
 
 ## 10. Despesas recorrentes
 

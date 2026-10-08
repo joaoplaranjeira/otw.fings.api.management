@@ -1,6 +1,8 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -13,6 +15,7 @@ using otw.fings.api.management.Security;
 using otw.fings.api.management.Services;
 using otw.fings.api.management.Services.Interfaces;
 using otw.fings.api.management.Settings;
+using otw.fings.api.management.Services.Notifications;
 
 DotEnvLoader.LoadIfPresent();
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +30,8 @@ builder.Services.AddOptions<HouseholdInvitationSettings>()
     .Bind(builder.Configuration.GetSection(HouseholdInvitationSettings.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services.Configure<WebPushSettings>(builder.Configuration.GetSection(WebPushSettings.SectionName));
+builder.Services.Configure<NotificationSettings>(builder.Configuration.GetSection(NotificationSettings.SectionName));
 
 var jwt = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("Jwt configuration is required.");
@@ -61,7 +66,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 builder.Services.AddDbContext<FingsDbContext>(options => options.UseMySQL(connectionString));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -102,6 +107,25 @@ builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddHttpClient<IEmailService, LoopsEmailService>();
 builder.Services.AddHostedService<RecurringExpenseWorker>();
+builder.Services.AddScoped<INotificationRuleEvaluator, AlwaysRuleEvaluator>();
+builder.Services.AddScoped<INotificationRuleEvaluator, BudgetThresholdCrossedRuleEvaluator>();
+builder.Services.AddScoped<INotificationRuleEvaluator, ExpenseAmountAboveRuleEvaluator>();
+builder.Services.AddScoped<INotificationRuleEvaluator, CategoryExpenseThresholdRuleEvaluator>();
+builder.Services.AddScoped<INotificationRuleEvaluator, MonthlyExpenseThresholdRuleEvaluator>();
+builder.Services.AddScoped<INotificationRecipientResolver, AllHouseholdMembersResolver>();
+builder.Services.AddScoped<INotificationRecipientResolver, HouseholdMembersExceptActorResolver>();
+builder.Services.AddScoped<INotificationRecipientResolver, HouseholdOwnersResolver>();
+builder.Services.AddScoped<INotificationRecipientResolver, HouseholdManagersResolver>();
+builder.Services.AddScoped<INotificationRecipientResolver, SpecificUsersResolver>();
+builder.Services.AddScoped<INotificationRecipientResolver, ActorOnlyResolver>();
+builder.Services.AddScoped<INotificationTemplateRenderer, NotificationTemplateRenderer>();
+builder.Services.AddScoped<INotificationChannel, WebPushNotificationChannel>();
+builder.Services.AddScoped<INotificationChannel, InAppNotificationChannel>();
+builder.Services.AddScoped<INotificationEventProcessor, NotificationEventProcessor>();
+builder.Services.AddScoped<INotificationDeliveryProcessor, NotificationDeliveryProcessor>();
+builder.Services.AddScoped<INotificationManagementService, NotificationManagementService>();
+builder.Services.AddHostedService<NotificationEventWorker>();
+builder.Services.AddHostedService<NotificationDeliveryWorker>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -115,6 +139,12 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    options.AddFixedWindowLimiter("push-subscriptions", limiter =>
+    {
+        limiter.PermitLimit = 20;
+        limiter.Window = TimeSpan.FromHours(1);
+        limiter.QueueLimit = 0;
+    });
 });
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];

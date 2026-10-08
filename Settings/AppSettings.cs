@@ -46,3 +46,21 @@ public sealed class HouseholdInvitationSettings
     [Range(1, 30)]
     public int ExpirationDays { get; init; } = 7;
 }
+
+public sealed class WebPushSettings
+{
+    public const string SectionName = "WebPush";
+    public string Subject { get; init; } = "mailto:geral@fings.pt";
+    public string PublicKey { get; init; } = string.Empty;
+    public string PrivateKey { get; init; } = string.Empty;
+}
+
+public sealed class NotificationSettings
+{
+    public const string SectionName = "Notifications";
+    public bool DefaultEnabled { get; init; } = true;
+    public Dictionary<string, bool> DefaultEnabledByType { get; init; } = new(StringComparer.Ordinal);
+    public int EventBatchSize { get; init; } = 50;
+    public int DeliveryBatchSize { get; init; } = 100;
+    public int PollIntervalSeconds { get; init; } = 10;
+}

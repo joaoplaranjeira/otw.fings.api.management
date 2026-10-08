@@ -94,6 +94,7 @@ public sealed class Income : Entity
 public sealed class Expense : Entity
 {
     public Guid HouseholdId { get; set; }
+    public long? CreatedByUserId { get; set; }
     public Guid CategoryId { get; set; }
     public Guid? SubcategoryId { get; set; }
     public DateOnly Date { get; set; }
@@ -104,6 +105,10 @@ public sealed class Expense : Entity
     public ExpenseOrigin Origin { get; set; } = ExpenseOrigin.Manual;
     public FinancialRecordStatus Status { get; set; } = FinancialRecordStatus.Confirmed;
     public Guid? RecurringExpenseId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public long? NotificationActorUserId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool NotificationEventsCaptured { get; set; }
     public Household Household { get; set; } = null!;
     public Category Category { get; set; } = null!;
     public Subcategory? Subcategory { get; set; }
@@ -129,6 +134,7 @@ public sealed class ExpenseLine : Entity
 public sealed class RecurringExpense : Entity
 {
     public Guid HouseholdId { get; set; }
+    public long? CreatedByUserId { get; set; }
     public Guid CategoryId { get; set; }
     public Guid? SubcategoryId { get; set; }
     public string Description { get; set; } = string.Empty;

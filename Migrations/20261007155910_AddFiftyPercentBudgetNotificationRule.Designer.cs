@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using otw.fings.api.management.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using otw.fings.api.management.Infrastructure.Data;
 namespace otw.fings.api.management.Migrations
 {
     [DbContext(typeof(FingsDbContext))]
-    partial class FingsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007155910_AddFiftyPercentBudgetNotificationRule")]
+    partial class AddFiftyPercentBudgetNotificationRule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

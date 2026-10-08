@@ -492,6 +492,8 @@ public sealed class FinanceService(
         var expense = new Expense
         {
             HouseholdId = householdId,
+            CreatedByUserId = userId,
+            NotificationActorUserId = userId,
             CategoryId = category.Id,
             SubcategoryId = subcategory?.Id,
             Date = request.Date,
@@ -547,6 +549,7 @@ public sealed class FinanceService(
 
         var expense = await repository.GetExpenseAsync(householdId, expenseId, cancellationToken)
             ?? throw new NotFoundException("Despesa não encontrada.");
+        expense.NotificationActorUserId = userId;
         var hasAutomaticLine = HasAutomaticLine(expense);
         List<(CreateExpenseLineRequest Request, Category Category, Subcategory? Subcategory)>? resolvedLines = null;
         if (request.Lines is not null)
@@ -624,6 +627,7 @@ public sealed class FinanceService(
 
         var expense = await repository.GetExpenseAsync(householdId, expenseId, cancellationToken)
             ?? throw new NotFoundException("Despesa não encontrada.");
+        expense.NotificationActorUserId = userId;
         if (request.Lines.Sum(x => x.Amount) != expense.Amount)
         {
             throw new ValidationException("A soma das parcelas tem de ser igual ao valor total da despesa.");
@@ -638,6 +642,29 @@ public sealed class FinanceService(
         expense.Subcategory = mainLine.Subcategory;
         await repository.SaveChangesAsync(cancellationToken);
         return Map(expense);
+    }
+
+    public async Task DeleteExpenseAsync(
+        Guid householdId,
+        Guid expenseId,
+        long userId,
+        CancellationToken cancellationToken)
+    {
+        var role = await EnsureMemberAsync(householdId, userId, true, cancellationToken);
+        if (role is not HouseholdRole.Owner and not HouseholdRole.Administrator)
+        {
+            throw new ForbiddenException("Apenas owners e administradores podem eliminar despesas.");
+        }
+        var expense = await repository.GetExpenseAsync(householdId, expenseId, cancellationToken)
+            ?? throw new NotFoundException("Despesa não encontrada.");
+        expense.NotificationActorUserId = userId;
+        if (role == HouseholdRole.Administrator && expense.CreatedByUserId != userId)
+        {
+            throw new ForbiddenException("Um administrador só pode eliminar as suas próprias despesas.");
+        }
+
+        expense.Status = FinancialRecordStatus.Cancelled;
+        await repository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ExpenseResponse>> GetExpensesAsync(
@@ -732,6 +759,7 @@ public sealed class FinanceService(
         var recurring = new RecurringExpense
         {
             HouseholdId = householdId,
+            CreatedByUserId = userId,
             CategoryId = request.CategoryId,
             SubcategoryId = request.SubcategoryId,
             Description = request.Description.Trim(),
@@ -823,7 +851,7 @@ public sealed class FinanceService(
         return Map(recurring);
     }
 
-    private async Task EnsureMemberAsync(Guid householdId, long userId, bool write, CancellationToken cancellationToken)
+    private async Task<HouseholdRole> EnsureMemberAsync(Guid householdId, long userId, bool write, CancellationToken cancellationToken)
     {
         var role = await repository.GetMemberRoleAsync(householdId, userId, cancellationToken)
             ?? throw new ForbiddenException("O utilizador não pertence ao agregado indicado.");
@@ -831,6 +859,7 @@ public sealed class FinanceService(
         {
             throw new ForbiddenException("O utilizador não tem permissões de escrita neste agregado.");
         }
+        return role;
     }
 
     private async Task<HouseholdRole> EnsureCanManageMembersAsync(
@@ -857,7 +886,7 @@ public sealed class FinanceService(
             .Select(x => new SubcategoryResponse(x.Id, x.Name, x.IsActive)).ToArray());
 
     private static ExpenseResponse Map(Expense expense) => new(
-        expense.Id, expense.Date, expense.Amount, expense.Description,
+        expense.Id, expense.CreatedByUserId, expense.Date, expense.Amount, expense.Description,
         expense.CategoryId, expense.Category.Name, expense.SubcategoryId, expense.Subcategory?.Name,
         expense.MerchantName, expense.MerchantTaxNumber, expense.Origin, expense.Status,
         expense.Lines.OrderBy(x => x.Position).Select(x => new ExpenseLineResponse(

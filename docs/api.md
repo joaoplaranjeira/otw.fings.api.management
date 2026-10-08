@@ -20,6 +20,7 @@
 - `GET /api/households/{householdId}/expenses/suggestions` — devolve as 10 combinações de descrição, comerciante, NIF, categoria e subcategoria mais frequentes entre hoje e os 29 dias anteriores; exclui despesas canceladas e registos sem comerciante.
 - `PATCH /api/households/{householdId}/expenses/{expenseId}` — edita o movimento e, opcionalmente, substitui as parcelas na mesma operação.
 - `PUT /api/households/{householdId}/expenses/{expenseId}/lines` — substitui todas as parcelas, mantendo o total atual.
+- `DELETE /api/households/{householdId}/expenses/{expenseId}` — desativa a despesa. Um `Owner` pode eliminar qualquer despesa; um `Administrator`, apenas as que criou.
 - `GET/POST /api/households/{householdId}/recurring-expenses`
 - `POST /api/households/{householdId}/recurring-expenses/{recurringExpenseId}/materialize` — cria imediatamente todas as ocorrências vencidas da regra, sem duplicar movimentos existentes.
 - `GET /api/households/{householdId}/dashboard/{year}/{month}`
