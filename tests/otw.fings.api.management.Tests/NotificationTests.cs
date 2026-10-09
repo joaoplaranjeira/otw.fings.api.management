@@ -13,6 +13,25 @@ namespace otw.fings.api.management.Tests;
 public sealed class NotificationTests
 {
     [Fact]
+    public void WebPushPayload_UsesCamelCaseTitleAndBody()
+    {
+        var notification = new Notification
+        {
+            Title = "Nova despesa",
+            Body = "Maria adicionou 12,50 € — Almoço",
+            ActionUrl = "/?view=expenses",
+            DeduplicationKey = "expense:1"
+        };
+
+        using var payload = JsonDocument.Parse(WebPushNotificationChannel.SerializePayload(notification));
+
+        Assert.Equal("Nova despesa", payload.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Maria adicionou 12,50 € — Almoço", payload.RootElement.GetProperty("body").GetString());
+        Assert.False(payload.RootElement.TryGetProperty("Title", out _));
+        Assert.False(payload.RootElement.TryGetProperty("Body", out _));
+    }
+
+    [Fact]
     public async Task CreatingExpense_CreatesExactlyOneAtomicOutboxEvent()
     {
         await using var db = CreateContext();

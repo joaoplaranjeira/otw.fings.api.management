@@ -30,15 +30,7 @@ public sealed class WebPushNotificationChannel(
         if (string.IsNullOrWhiteSpace(settings.PublicKey) || string.IsNullOrWhiteSpace(settings.PrivateKey))
             return new DeliveryResult(false, IsTransient: true, Error: "Web Push não está configurado.");
 
-        var payload = JsonSerializer.Serialize(new
-        {
-            notification.Title,
-            notification.Body,
-            icon = "/icon-192.png",
-            badge = "/icon-192.png",
-            url = notification.ActionUrl,
-            tag = notification.DeduplicationKey
-        });
+        var payload = SerializePayload(notification);
         try
         {
             using var client = new WebPushClient();
@@ -63,4 +55,15 @@ public sealed class WebPushNotificationChannel(
             return new DeliveryResult(false, IsTransient: true, Error: exception.Message);
         }
     }
+
+    internal static string SerializePayload(Notification notification) =>
+        JsonSerializer.Serialize(new
+        {
+            title = notification.Title,
+            body = notification.Body,
+            icon = "/icon-192.png",
+            badge = "/icon-192.png",
+            url = notification.ActionUrl,
+            tag = notification.DeduplicationKey
+        });
 }
