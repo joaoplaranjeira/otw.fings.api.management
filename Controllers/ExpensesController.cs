@@ -18,6 +18,21 @@ public sealed class ExpensesController(IFinanceService service, ICurrentUserCont
         CancellationToken cancellationToken) =>
         Ok(await service.GetExpensesAsync(householdId, currentUser.UserId, from, to, cancellationToken));
 
+    [HttpGet("subcategories/{subcategoryId:guid}")]
+    public async Task<ActionResult<IReadOnlyList<ExpenseResponse>>> GetBySubcategory(
+        Guid householdId,
+        Guid subcategoryId,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken cancellationToken) =>
+        Ok(await service.GetExpensesBySubcategoryAsync(
+            householdId,
+            subcategoryId,
+            currentUser.UserId,
+            from,
+            to,
+            cancellationToken));
+
     [HttpGet("suggestions")]
     public async Task<ActionResult<IReadOnlyList<FrequentExpenseSuggestionResponse>>> GetSuggestions(
         Guid householdId,

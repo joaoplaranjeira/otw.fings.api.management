@@ -511,6 +511,40 @@ public sealed class FinanceServiceTests
     }
 
     [Fact]
+    public async Task GetExpensesBySubcategory_UsesExpenseLinesForSearch()
+    {
+        await using var db = CreateDbContext();
+        var (household, food) = await SeedAsync(db);
+        var groceries = new Subcategory { CategoryId = food.Id, Name = "Supermercado" };
+        var health = new Category { HouseholdId = household.Id, Name = "Saúde" };
+        var pharmacy = new Subcategory { CategoryId = health.Id, Name = "Farmácia" };
+        db.AddRange(groceries, health, pharmacy);
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        var splitExpense = await service.CreateExpenseAsync(
+            household.Id,
+            1,
+            new CreateExpenseRequest(
+                null, null, new(2027, 1, 5), 25m, "Talão", "Loja", null, ExpenseOrigin.Receipt,
+                [
+                    new(food.Id, groceries.Id, "Mercearia", 1, 10m, 10m),
+                    new(health.Id, pharmacy.Id, "Higiene", 1, 15m, 15m)
+                ]),
+            CancellationToken.None);
+        var groceriesExpense = await service.CreateExpenseAsync(
+            household.Id,
+            1,
+            new(food.Id, groceries.Id, new(2027, 1, 6), 5m, "Pão", "Mercado", null),
+            CancellationToken.None);
+
+        var groceriesExpenses = await service.GetExpensesBySubcategoryAsync(
+            household.Id, groceries.Id, 1, new(2027, 1, 1), new(2027, 1, 31), CancellationToken.None);
+
+        Assert.Equal([groceriesExpense.Id, splitExpense.Id], groceriesExpenses.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task UpdateExpense_UpdatesAutomaticallyCreatedLine()
     {
         await using var db = CreateDbContext();

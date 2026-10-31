@@ -679,6 +679,25 @@ public sealed class FinanceService(
         return (await repository.GetExpensesAsync(householdId, from, to, cancellationToken)).Select(Map).ToArray();
     }
 
+    public async Task<IReadOnlyList<ExpenseResponse>> GetExpensesBySubcategoryAsync(
+        Guid householdId,
+        Guid subcategoryId,
+        long userId,
+        DateOnly from,
+        DateOnly to,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, false, cancellationToken);
+        ValidateRange(from, to);
+        var expenses = await repository.GetExpensesAsync(householdId, from, to, cancellationToken);
+        return expenses
+            .Where(expense => expense.Lines.Count > 0
+                ? expense.Lines.Any(line => line.SubcategoryId == subcategoryId)
+                : expense.SubcategoryId == subcategoryId)
+            .Select(Map)
+            .ToArray();
+    }
+
     public async Task<IReadOnlyList<FrequentExpenseSuggestionResponse>> GetFrequentExpenseSuggestionsAsync(
         Guid householdId,
         long userId,
