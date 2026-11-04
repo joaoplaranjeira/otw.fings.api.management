@@ -101,7 +101,7 @@ public sealed record CreateExpenseRequest(
     IReadOnlyList<CreateExpenseLineRequest>? Lines = null);
 
 public sealed record CreateExpenseLineRequest(
-    Guid CategoryId,
+    Guid? CategoryId,
     Guid? SubcategoryId,
     [Required, MaxLength(500)] string Description,
     decimal? Quantity,

@@ -448,11 +448,13 @@ public sealed class FinanceServiceTests
                 ExpenseOrigin.Receipt,
                 [
                     new(category.Id, null, "Produto", 1, 50m, 50m),
-                    new(category.Id, null, "Desconto", 1, -5m, -5m)
+                    new(null, null, "Desconto", null, null, -5m)
                 ]),
             CancellationToken.None);
 
         Assert.Equal(new[] { 50m, -5m }, created.Lines.Select(x => x.Amount).ToArray());
+        Assert.Null(created.Lines[1].Quantity);
+        Assert.Null(created.Lines[1].UnitPrice);
 
         var replaced = await service.ReplaceExpenseLinesAsync(
             household.Id,
@@ -460,7 +462,7 @@ public sealed class FinanceServiceTests
             1,
             new([
                 new(category.Id, null, "Produto corrigido", 1, 55m, 55m),
-                new(category.Id, null, "Desconto corrigido", 1, -10m, -10m)
+                new(null, null, "Desconto corrigido", null, null, -10m)
             ]),
             CancellationToken.None);
 

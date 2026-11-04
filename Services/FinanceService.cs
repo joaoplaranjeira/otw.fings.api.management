@@ -435,8 +435,8 @@ public sealed class FinanceService(
             throw new ValidationException("A origem da despesa é inválida.");
         }
 
-        var requestedLines = request.Lines is { Count: > 0 }
-            ? request.Lines
+        var requestedLines = request.Lines is { Count: > 0 } lines
+            ? NormalizeDiscountLines(lines)
             : null;
         if (!request.CategoryId.HasValue && request.SubcategoryId.HasValue)
         {
@@ -455,7 +455,7 @@ public sealed class FinanceService(
                 if (line.Amount == 0) throw new ValidationException("O valor de uma parcela não pode ser zero.");
                 if (line.Quantity is <= 0) throw new ValidationException("A quantidade de uma parcela deve ser superior a zero.");
                 if (line.UnitPrice == 0) throw new ValidationException("O preço unitário de uma parcela não pode ser zero.");
-                var lineCategory = await repository.GetCategoryAsync(householdId, line.CategoryId, cancellationToken)
+                var lineCategory = await repository.GetCategoryAsync(householdId, line.CategoryId!.Value, cancellationToken)
                     ?? throw new ValidationException("A categoria de uma parcela não pertence ao agregado.");
                 Subcategory? lineSubcategory = null;
                 if (line.SubcategoryId.HasValue)
@@ -925,16 +925,17 @@ public sealed class FinanceService(
 
     private async Task<List<(CreateExpenseLineRequest Request, Category Category, Subcategory? Subcategory)>> ResolveLinesAsync(
         Guid householdId,
-        IReadOnlyList<CreateExpenseLineRequest> lines,
+        IReadOnlyList<CreateExpenseLineRequest> requestedLines,
         CancellationToken cancellationToken)
     {
+        var lines = NormalizeDiscountLines(requestedLines);
         var resolved = new List<(CreateExpenseLineRequest, Category, Subcategory?)>(lines.Count);
         foreach (var line in lines)
         {
             if (line.Amount == 0) throw new ValidationException("O valor de uma parcela não pode ser zero.");
             if (line.Quantity is <= 0) throw new ValidationException("A quantidade de uma parcela deve ser superior a zero.");
             if (line.UnitPrice == 0) throw new ValidationException("O preço unitário de uma parcela não pode ser zero.");
-            var category = await repository.GetCategoryAsync(householdId, line.CategoryId, cancellationToken)
+            var category = await repository.GetCategoryAsync(householdId, line.CategoryId!.Value, cancellationToken)
                 ?? throw new ValidationException("A categoria de uma parcela não pertence ao agregado.");
             Subcategory? subcategory = null;
             if (line.SubcategoryId.HasValue)
@@ -945,6 +946,29 @@ public sealed class FinanceService(
             resolved.Add((line, category, subcategory));
         }
         return resolved;
+    }
+
+    private static IReadOnlyList<CreateExpenseLineRequest> NormalizeDiscountLines(
+        IReadOnlyList<CreateExpenseLineRequest> lines)
+    {
+        var fallbackCategoryId = lines
+            .FirstOrDefault(line => line.Amount > 0 && line.CategoryId.HasValue)?.CategoryId;
+        if (!fallbackCategoryId.HasValue)
+        {
+            throw new ValidationException("É necessária pelo menos uma parcela de despesa com categoria.");
+        }
+
+        return lines.Select(line => line.Amount < 0
+            ? line with
+            {
+                CategoryId = fallbackCategoryId,
+                SubcategoryId = null,
+                Quantity = null,
+                UnitPrice = null
+            }
+            : line.CategoryId.HasValue
+                ? line
+                : throw new ValidationException("A categoria é obrigatória nas parcelas de despesa.")).ToArray();
     }
 
     private static bool HasAutomaticLine(Expense expense)
