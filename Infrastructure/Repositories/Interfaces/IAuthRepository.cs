@@ -13,9 +13,9 @@ public interface IAuthRepository
     Task<HouseholdInvitation?> GetHouseholdInvitationByCodeHashAsync(string codeHash, CancellationToken cancellationToken);
     Task RegisterAsync(
         User user,
-        Household? household,
-        HouseholdMember? membership,
-        IReadOnlyList<Category>? categories,
+        IReadOnlyList<Household> newHouseholds,
+        IReadOnlyList<HouseholdMember> memberships,
+        IReadOnlyList<Category> categories,
         HouseholdInvitation? invitation,
         DateTimeOffset? invitationAcceptedAt,
         CancellationToken cancellationToken);

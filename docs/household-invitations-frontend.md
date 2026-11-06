@@ -1,8 +1,8 @@
-# Integração frontend — registo sem agregado e convites para agregados
+# Integração frontend — registo e convites para agregados
 
 Este documento define o contrato funcional proposto para permitir:
 
-- registar um utilizador sem criar automaticamente um agregado familiar;
+- registar um utilizador com um contexto pessoal privado;
 - convidar uma pessoa para um agregado por email;
 - atribuir a role do futuro membro no momento do convite;
 - aceitar o convite com um código ou através de um link que transporta esse código;
@@ -13,6 +13,8 @@ Este documento define o contrato funcional proposto para permitir:
 ## 1. Conceitos e regras
 
 Um convite pertence a um agregado, destina-se a um email e guarda a role que será atribuída quando for aceite.
+
+Convites existem apenas em agregados `Shared`; o contexto `Personal` não permite membros adicionais nem convites.
 
 - O código é gerado pelo backend, é único, não deve ser previsível e não é o código OTP de autenticação.
 - O email usado para aceitar o convite tem de coincidir com o email do convite, depois de normalizado.
@@ -48,7 +50,7 @@ O frontend deve continuar a obter as roles através de:
 
 Estas regras são validadas pelo backend. Ocultar opções sem permissão no frontend serve apenas para melhorar a experiência.
 
-## 3. Registar um utilizador sem criar agregado
+## 3. Registar um utilizador sem criar agregado partilhado
 
 `POST /api/users`
 
@@ -76,7 +78,7 @@ Resposta `201 Created`:
 }
 ```
 
-Este registo não cria nenhum agregado nem nenhuma associação. Depois de autenticar, `GET /api/households` pode devolver `[]`. Nesse estado, o frontend deve apresentar as opções "Criar agregado" e "Entrar com convite" em vez de assumir que existe um agregado ativo.
+Este registo cria o contexto `Personal` e associa o utilizador como `Owner`. Depois de autenticar, `GET /api/households` devolve pelo menos esse contexto. O frontend deve usá-lo como seleção inicial quando não existir uma seleção anterior válida.
 
 ### 3.2 Registo com criação de agregado
 
@@ -91,7 +93,7 @@ O fluxo atual continua disponível:
 }
 ```
 
-O utilizador é associado ao novo agregado como `Owner`.
+O utilizador recebe o contexto pessoal e é também associado ao novo agregado `Shared` como `Owner`.
 
 ### 3.3 Registo através de convite
 
@@ -104,7 +106,7 @@ O utilizador é associado ao novo agregado como `Owner`.
 }
 ```
 
-O utilizador é criado e associado ao agregado com a role guardada no convite. O frontend não envia a role durante o registo.
+O utilizador recebe o contexto pessoal e é também associado ao agregado do convite com a role guardada. O frontend não envia a role durante o registo.
 
 `householdName` e `invitationCode` são mutuamente exclusivos. Se ambos forem enviados, a API responde `422 Unprocessable Entity`.
 
@@ -362,7 +364,7 @@ O convite aceite não deve continuar na lista de pendentes, e a remoção futura
 
 ## 12. Critérios de aceitação
 
-- É possível criar uma conta sem `householdName` e obter uma lista de agregados vazia.
+- É possível criar uma conta sem `householdName` e obter o contexto pessoal.
 - É possível continuar a criar uma conta com um novo agregado.
 - `Owner` e `Administrator` conseguem convidar de acordo com as suas permissões.
 - A role é escolhida no convite e não pode ser alterada pela pessoa convidada.

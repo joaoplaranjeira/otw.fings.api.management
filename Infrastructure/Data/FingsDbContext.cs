@@ -72,6 +72,12 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.Currency).HasMaxLength(3);
             entity.Property(x => x.TimeZone).HasMaxLength(100);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Households_TypeOwner",
+                "(`Type` = 1 AND `PersonalOwnerUserId` IS NOT NULL) OR (`Type` = 2 AND `PersonalOwnerUserId` IS NULL)"));
+            entity.HasIndex(x => x.PersonalOwnerUserId).IsUnique();
+            entity.HasOne(x => x.PersonalOwnerUser).WithMany()
+                .HasForeignKey(x => x.PersonalOwnerUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<HouseholdMember>(entity =>

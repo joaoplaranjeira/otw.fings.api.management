@@ -56,6 +56,7 @@ Antes do primeiro deploy:
 O Heroku fornece a variável `PORT` em runtime; o container usa-a automaticamente e mantém a porta `8080` como valor por omissão para execução local.
 
 O contrato geral para o frontend está documentado em [`docs/frontend-integration.md`](docs/frontend-integration.md), com a gestão de membros detalhada em [`docs/household-members-frontend.md`](docs/household-members-frontend.md) e os convites em [`docs/household-invitations-frontend.md`](docs/household-invitations-frontend.md).
+O seletor entre o contexto pessoal e os agregados partilhados está documentado em [`docs/personal-households-frontend.md`](docs/personal-households-frontend.md).
 
 ## Semântica do orçamento
 

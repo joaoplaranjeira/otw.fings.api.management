@@ -22,6 +22,8 @@ public sealed class FinanceServiceTests
             new CreateHouseholdRequest("Família", "EUR", "Europe/Lisbon"),
             CancellationToken.None);
 
+        Assert.Equal(HouseholdType.Shared, result.Type);
+
         var categories = await db.Categories
             .Include(x => x.Subcategories)
             .Where(x => x.HouseholdId == result.Id)
@@ -46,6 +48,41 @@ public sealed class FinanceServiceTests
         var membership = await db.HouseholdMembers.SingleAsync(x => x.HouseholdId == result.Id);
         Assert.Equal(1, membership.UserId);
         Assert.Equal(HouseholdRole.Owner, membership.Role);
+    }
+
+    [Fact]
+    public async Task PersonalHousehold_RejectsMemberManagement()
+    {
+        await using var db = CreateDbContext();
+        var owner = CreateUser(1, "Owner", "owner", "owner@example.com");
+        var personal = new Household
+        {
+            Name = "Pessoal",
+            Type = HouseholdType.Personal,
+            PersonalOwnerUserId = owner.Id
+        };
+        db.AddRange(
+            owner,
+            personal,
+            new HouseholdMember
+            {
+                HouseholdId = personal.Id,
+                UserId = owner.Id,
+                Role = HouseholdRole.Owner
+            });
+        await db.SaveChangesAsync();
+        var service = new FinanceService(new FinanceRepository(db));
+
+        await Assert.ThrowsAsync<ConflictException>(() => service.AddHouseholdMemberAsync(
+            personal.Id,
+            owner.Id,
+            new AddHouseholdMemberRequest(
+                null,
+                null,
+                "Outra pessoa",
+                HouseholdRelationship.Other,
+                new DateOnly(1990, 1, 1)),
+            CancellationToken.None));
     }
 
     [Fact]

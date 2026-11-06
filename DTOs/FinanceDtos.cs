@@ -2,7 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace otw.fings.api.management.DTOs;
 
-public sealed record HouseholdResponse(Guid Id, string Name, string Currency, string TimeZone, HouseholdRole Role);
+public sealed record HouseholdResponse(
+    Guid Id,
+    string Name,
+    string Currency,
+    string TimeZone,
+    HouseholdRole Role,
+    HouseholdType Type);
 
 public sealed record CreateHouseholdRequest(
     [Required, MaxLength(200)] string Name,

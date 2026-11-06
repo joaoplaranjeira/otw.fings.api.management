@@ -6,7 +6,7 @@ Este documento descreve a funcionalidade atualmente implementada na API `otw.fin
 
 A primeira versão permite:
 
-- registar um utilizador com ou sem criar o seu primeiro agregado familiar;
+- registar um utilizador com contexto pessoal e, opcionalmente, criar ou associar um agregado partilhado;
 - autenticar por código OTP enviado por email;
 - gerir vários agregados por utilizador;
 - adicionar, listar e remover membros dos agregados familiares;
@@ -36,7 +36,7 @@ Convenções:
 - GUIDs como strings.
 - Valores monetários como números JSON, nunca strings formatadas.
 - Moeda inicial `EUR`.
-- Enums são serializados como números.
+- Enums são serializados pelos respetivos nomes (`"Personal"`, `"Owner"`, etc.).
 - Todos os endpoints, exceto registo, OTP, consulta pública de convite e health check, exigem Bearer token.
 - Não existe prefixo de versão; os endpoints funcionais começam em `/api`.
 
@@ -92,7 +92,7 @@ Resposta `201 Created`:
 }
 ```
 
-`householdName` e `invitationCode` são opcionais e mutuamente exclusivos. Com `householdName`, o registo cria um agregado e associa o utilizador como `Owner`; com `invitationCode`, associa-o ao agregado e à role do convite; sem ambos, cria apenas a conta. Email e username duplicados devolvem `409`.
+`householdName` e `invitationCode` são opcionais e mutuamente exclusivos. O registo cria sempre o contexto pessoal. Com `householdName`, cria ainda um agregado `Shared` e associa o utilizador como `Owner`; com `invitationCode`, associa-o também ao agregado do convite e à respetiva role. Email e username duplicados devolvem `409`.
 
 O contrato completo do registo e dos convites está em [`household-invitations-frontend.md`](household-invitations-frontend.md).
 
@@ -181,13 +181,16 @@ O email não pode ser alterado neste endpoint, uma vez que identifica o utilizad
 [
   {
     "id": "8af810fc-f7f5-4fde-bb63-b530ae8fb4a1",
-    "name": "Família Santos",
+    "name": "Pessoal",
     "currency": "EUR",
     "timeZone": "Europe/Lisbon",
-    "role": 1
+    "role": "Owner",
+    "type": "Personal"
   }
 ]
 ```
+
+Cada utilizador recebe automaticamente um contexto `Personal` e pode pertencer a vários contextos `Shared`. A seleção e troca do contexto ativo está detalhada em [`personal-households-frontend.md`](personal-households-frontend.md).
 
 ### Criar agregado adicional
 
@@ -195,13 +198,13 @@ O email não pode ser alterado neste endpoint, uma vez que identifica o utilizad
 
 ```json
 {
-  "name": "Finanças pessoais",
+  "name": "Família Santos",
   "currency": "EUR",
   "timeZone": "Europe/Lisbon"
 }
 ```
 
-Resposta `201 Created` no mesmo formato da listagem.
+Resposta `201 Created` no mesmo formato da listagem, sempre com `type: "Shared"`. O contexto `Personal` não é criado por este endpoint.
 
 A criação de um agregado também cria automaticamente o catálogo inicial de categorias e subcategorias de despesa. O catálogo pertence ao novo agregado e fica imediatamente disponível em `GET /api/households/{householdId}/categories`.
 

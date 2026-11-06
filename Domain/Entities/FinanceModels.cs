@@ -5,6 +5,9 @@ public sealed class Household : Entity
     public string Name { get; set; } = string.Empty;
     public string Currency { get; set; } = "EUR";
     public string TimeZone { get; set; } = "Europe/Lisbon";
+    public HouseholdType Type { get; set; } = HouseholdType.Shared;
+    public long? PersonalOwnerUserId { get; set; }
+    public User? PersonalOwnerUser { get; set; }
     public ICollection<HouseholdMember> Members { get; set; } = [];
     public ICollection<HouseholdInvitation> Invitations { get; set; } = [];
 }

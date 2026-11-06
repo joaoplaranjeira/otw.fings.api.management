@@ -271,17 +271,29 @@ namespace otw.fings.api.management.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
+                    b.Property<long?>("PersonalOwnerUserId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("datetime");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Households");
+                    b.HasIndex("PersonalOwnerUserId")
+                        .IsUnique();
+
+                    b.ToTable("Households", t =>
+                        {
+                            t.HasCheckConstraint("CK_Households_TypeOwner", "(`Type` = 1 AND `PersonalOwnerUserId` IS NOT NULL) OR (`Type` = 2 AND `PersonalOwnerUserId` IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.HouseholdInvitation", b =>
@@ -1364,6 +1376,16 @@ namespace otw.fings.api.management.Migrations
                     b.Navigation("Expense");
 
                     b.Navigation("Subcategory");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.Household", b =>
+                {
+                    b.HasOne("otw.fings.api.management.Domain.Entities.User", "PersonalOwnerUser")
+                        .WithMany()
+                        .HasForeignKey("PersonalOwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PersonalOwnerUser");
                 });
 
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.HouseholdInvitation", b =>

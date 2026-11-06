@@ -15,11 +15,21 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
             .Select(x => (HouseholdRole?)x.Role)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<Household?> GetHouseholdAsync(Guid householdId, CancellationToken cancellationToken) =>
+        dbContext.Households.AsNoTracking().SingleOrDefaultAsync(x => x.Id == householdId, cancellationToken);
+
     public async Task<IReadOnlyList<HouseholdResponse>> GetHouseholdsAsync(long userId, CancellationToken cancellationToken) =>
         await dbContext.HouseholdMembers.AsNoTracking()
             .Where(x => x.UserId == userId)
-            .OrderBy(x => x.Household.Name)
-            .Select(x => new HouseholdResponse(x.HouseholdId, x.Household.Name, x.Household.Currency, x.Household.TimeZone, x.Role!.Value))
+            .OrderBy(x => x.Household.Type)
+            .ThenBy(x => x.Household.Name)
+            .Select(x => new HouseholdResponse(
+                x.HouseholdId,
+                x.Household.Name,
+                x.Household.Currency,
+                x.Household.TimeZone,
+                x.Role!.Value,
+                x.Household.Type))
             .ToListAsync(cancellationToken);
 
     public async Task AddHouseholdAsync(

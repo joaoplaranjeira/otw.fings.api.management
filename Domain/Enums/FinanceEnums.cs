@@ -1,5 +1,11 @@
 namespace otw.fings.api.management.Domain.Enums;
 
+public enum HouseholdType
+{
+    Personal = 1,
+    Shared = 2
+}
+
 public enum HouseholdRole
 {
     Owner = 1,

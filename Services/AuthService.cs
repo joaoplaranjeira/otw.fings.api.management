@@ -171,29 +171,53 @@ public sealed class AuthService(
             InsertedDate = now,
             UpdatedDate = now
         };
-        Household? household = null;
-        HouseholdMember? membership = null;
-        IReadOnlyList<Category>? categories = null;
+        var personalHousehold = new Household
+        {
+            Name = "Pessoal",
+            Type = HouseholdType.Personal
+        };
+        var newHouseholds = new List<Household> { personalHousehold };
+        var memberships = new List<HouseholdMember>
+        {
+            new()
+            {
+                HouseholdId = personalHousehold.Id,
+                Role = HouseholdRole.Owner,
+                Relationship = HouseholdRelationship.Self,
+                Name = request.Name.Trim()
+            }
+        };
+        var categories = new List<Category>();
+        categories.AddRange(StandardCategoryCatalog.CreateFor(personalHousehold.Id));
 
         if (!string.IsNullOrWhiteSpace(householdName))
         {
-            household = new Household { Name = householdName };
-            membership = new HouseholdMember { HouseholdId = household.Id, Role = HouseholdRole.Owner };
-            categories = StandardCategoryCatalog.CreateFor(household.Id);
+            var sharedHousehold = new Household
+            {
+                Name = householdName,
+                Type = HouseholdType.Shared
+            };
+            newHouseholds.Add(sharedHousehold);
+            memberships.Add(new HouseholdMember
+            {
+                HouseholdId = sharedHousehold.Id,
+                Role = HouseholdRole.Owner
+            });
+            categories.AddRange(StandardCategoryCatalog.CreateFor(sharedHousehold.Id));
         }
         else if (invitation is not null)
         {
-            membership = new HouseholdMember
+            memberships.Add(new HouseholdMember
             {
                 HouseholdId = invitation.HouseholdId,
                 Role = invitation.Role
-            };
+            });
         }
 
         await repository.RegisterAsync(
             user,
-            household,
-            membership,
+            newHouseholds,
+            memberships,
             categories,
             invitation,
             invitation is null ? null : nowOffset,
@@ -247,6 +271,10 @@ public sealed class AuthService(
 
     private static void EnsureInvitationCanBeAccepted(HouseholdInvitation invitation, string email)
     {
+        if (invitation.Household.Type == HouseholdType.Personal)
+        {
+            throw new ConflictException("O contexto pessoal não permite convites.");
+        }
         if (invitation.Status == HouseholdInvitationStatus.Accepted)
         {
             throw new ConflictException("O convite já foi aceite.");

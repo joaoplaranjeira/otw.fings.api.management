@@ -2,7 +2,7 @@
 
 ## Acesso público
 
-- `POST /api/users` — regista utilizador e primeiro agregado.
+- `POST /api/users` — regista o utilizador, cria sempre o seu contexto pessoal e, opcionalmente, cria ou associa um agregado partilhado.
 - `POST /api/otp/send` — envia OTP para um utilizador ativo; em modo bypass não envia email.
 - `POST /api/otp/validate` — valida OTP e devolve JWT Bearer; com `Otp__BypassEnabled=true`, aceita o código fixo `123123` para utilizadores ativos.
 - `GET /health` — health check técnico.

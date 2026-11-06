@@ -190,6 +190,12 @@ public sealed class HouseholdInvitationService(
     {
         var role = await financeRepository.GetMemberRoleAsync(householdId, userId, cancellationToken)
             ?? throw new ForbiddenException("O utilizador não pertence ao agregado indicado.");
+        var household = await invitationRepository.GetHouseholdAsync(householdId, cancellationToken)
+            ?? throw new NotFoundException("Agregado não encontrado.");
+        if (household.Type == HouseholdType.Personal)
+        {
+            throw new ConflictException("O contexto pessoal não permite convites.");
+        }
         if (role is not (HouseholdRole.Owner or HouseholdRole.Administrator))
         {
             throw new ForbiddenException("O utilizador não pode gerir convites deste agregado.");
@@ -217,9 +223,17 @@ public sealed class HouseholdInvitationService(
 
     private async Task<HouseholdInvitation> GetInvitationByCodeAsync(
         string code,
-        CancellationToken cancellationToken) =>
-        await invitationRepository.GetByCodeHashAsync(HouseholdInvitationCodes.Hash(code), cancellationToken)
-            ?? throw new NotFoundException("Convite não encontrado.");
+        CancellationToken cancellationToken)
+    {
+        var invitation = await invitationRepository.GetByCodeHashAsync(
+            HouseholdInvitationCodes.Hash(code),
+            cancellationToken) ?? throw new NotFoundException("Convite não encontrado.");
+        if (invitation.Household.Type == HouseholdType.Personal)
+        {
+            throw new ConflictException("O contexto pessoal não permite convites.");
+        }
+        return invitation;
+    }
 
     private static void EnsurePending(HouseholdInvitation invitation)
     {

@@ -4,6 +4,7 @@ public interface IFinanceRepository
 {
     Task<bool> IsMemberAsync(Guid householdId, long userId, CancellationToken cancellationToken);
     Task<HouseholdRole?> GetMemberRoleAsync(Guid householdId, long userId, CancellationToken cancellationToken);
+    Task<Household?> GetHouseholdAsync(Guid householdId, CancellationToken cancellationToken);
     Task<IReadOnlyList<HouseholdResponse>> GetHouseholdsAsync(long userId, CancellationToken cancellationToken);
     Task AddHouseholdAsync(
         Household household,

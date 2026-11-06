@@ -25,7 +25,8 @@ public sealed class FinanceService(
         {
             Name = request.Name.Trim(),
             Currency = request.Currency.Trim().ToUpperInvariant(),
-            TimeZone = request.TimeZone.Trim()
+            TimeZone = request.TimeZone.Trim(),
+            Type = HouseholdType.Shared
         };
         var membership = new HouseholdMember
         {
@@ -35,7 +36,13 @@ public sealed class FinanceService(
         };
         var categories = StandardCategoryCatalog.CreateFor(household.Id);
         await repository.AddHouseholdAsync(household, membership, categories, cancellationToken);
-        return new(household.Id, household.Name, household.Currency, household.TimeZone, membership.Role!.Value);
+        return new(
+            household.Id,
+            household.Name,
+            household.Currency,
+            household.TimeZone,
+            membership.Role!.Value,
+            household.Type);
     }
 
     public IReadOnlyList<HouseholdRoleResponse> GetHouseholdRoles() =>
@@ -888,6 +895,12 @@ public sealed class FinanceService(
     {
         var role = await repository.GetMemberRoleAsync(householdId, userId, cancellationToken)
             ?? throw new ForbiddenException("O utilizador não pertence ao agregado indicado.");
+        var household = await repository.GetHouseholdAsync(householdId, cancellationToken)
+            ?? throw new NotFoundException("Agregado não encontrado.");
+        if (household.Type == HouseholdType.Personal)
+        {
+            throw new ConflictException("O contexto pessoal não permite gerir membros.");
+        }
         if (role is not HouseholdRole.Owner and not HouseholdRole.Administrator)
         {
             throw new ForbiddenException("O utilizador não tem permissões para gerir membros deste agregado.");

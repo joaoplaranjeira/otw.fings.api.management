@@ -114,6 +114,36 @@ public sealed class HouseholdInvitationServiceTests
     }
 
     [Fact]
+    public async Task PersonalHousehold_RejectsInvitations()
+    {
+        await using var db = CreateDbContext();
+        var owner = CreateUser(1, "Owner", "owner", "owner@example.com");
+        var personal = new Household
+        {
+            Name = "Pessoal",
+            Type = HouseholdType.Personal,
+            PersonalOwnerUserId = owner.Id
+        };
+        db.AddRange(
+            owner,
+            personal,
+            new HouseholdMember
+            {
+                HouseholdId = personal.Id,
+                UserId = owner.Id,
+                Role = HouseholdRole.Owner
+            });
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ConflictException>(() => service.CreateAsync(
+            personal.Id,
+            owner.Id,
+            new CreateHouseholdInvitationRequest("other@example.com", HouseholdRole.Member),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Preview_RejectsExpiredInvitation()
     {
         await using var db = CreateDbContext();

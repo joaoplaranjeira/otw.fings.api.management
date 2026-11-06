@@ -62,9 +62,9 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
 
     public async Task RegisterAsync(
         User user,
-        Household? household,
-        HouseholdMember? membership,
-        IReadOnlyList<Category>? categories,
+        IReadOnlyList<Household> newHouseholds,
+        IReadOnlyList<HouseholdMember> memberships,
+        IReadOnlyList<Category> categories,
         HouseholdInvitation? invitation,
         DateTimeOffset? invitationAcceptedAt,
         CancellationToken cancellationToken)
@@ -76,17 +76,18 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        if (household is not null)
+        foreach (var household in newHouseholds.Where(x => x.Type == HouseholdType.Personal))
         {
-            dbContext.Households.Add(household);
-            if (categories is not null) dbContext.Categories.AddRange(categories);
+            household.PersonalOwnerUserId = user.Id;
         }
+        dbContext.Households.AddRange(newHouseholds);
+        dbContext.Categories.AddRange(categories);
 
-        if (membership is not null)
+        foreach (var membership in memberships)
         {
             membership.UserId = user.Id;
-            dbContext.HouseholdMembers.Add(membership);
         }
+        dbContext.HouseholdMembers.AddRange(memberships);
 
         if (invitation is not null)
         {

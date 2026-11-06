@@ -116,7 +116,7 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task Register_WithoutHousehold_CreatesOnlyUser()
+    public async Task Register_WithoutSharedHousehold_CreatesPersonalHousehold()
     {
         await using var db = CreateDbContext();
         var service = CreateService(db);
@@ -127,8 +127,35 @@ public sealed class AuthServiceTests
 
         Assert.Equal("maria@example.com", result.Email);
         Assert.Single(db.Users);
-        Assert.Empty(db.Households);
-        Assert.Empty(db.HouseholdMembers);
+        var personal = await db.Households.SingleAsync();
+        Assert.Equal(HouseholdType.Personal, personal.Type);
+        Assert.Equal(result.Id, personal.PersonalOwnerUserId);
+        var membership = await db.HouseholdMembers.SingleAsync();
+        Assert.Equal(personal.Id, membership.HouseholdId);
+        Assert.Equal(result.Id, membership.UserId);
+        Assert.Equal(HouseholdRole.Owner, membership.Role);
+        Assert.NotEmpty(db.Categories);
+    }
+
+    [Fact]
+    public async Task Register_WithHousehold_CreatesPersonalAndSharedContexts()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var result = await service.RegisterAsync(
+            new RegisterUserRequest("Maria", "maria", "maria@example.com", "Família Santos"),
+            CancellationToken.None);
+
+        var households = await db.Households.OrderBy(x => x.Type).ToListAsync();
+        Assert.Equal(2, households.Count);
+        var personal = Assert.Single(households, x => x.Type == HouseholdType.Personal);
+        var shared = Assert.Single(households, x => x.Type == HouseholdType.Shared);
+        Assert.Equal(result.Id, personal.PersonalOwnerUserId);
+        Assert.Null(shared.PersonalOwnerUserId);
+        Assert.Equal("Família Santos", shared.Name);
+        Assert.Equal(2, await db.HouseholdMembers.CountAsync(x => x.UserId == result.Id));
+        Assert.Equal(26, await db.Categories.CountAsync());
     }
 
     [Fact]
@@ -163,10 +190,14 @@ public sealed class AuthServiceTests
             new RegisterUserRequest("Maria", "maria", "maria@example.com", InvitationCode: code),
             CancellationToken.None);
 
-        var membership = await db.HouseholdMembers.SingleAsync();
+        var memberships = await db.HouseholdMembers.ToListAsync();
+        Assert.Equal(2, memberships.Count);
+        var membership = Assert.Single(memberships, x => x.HouseholdId == household.Id);
         Assert.Equal(result.Id, membership.UserId);
         Assert.Equal(household.Id, membership.HouseholdId);
         Assert.Equal(HouseholdRole.Member, membership.Role);
+        var personal = Assert.Single(db.Households, x => x.Type == HouseholdType.Personal);
+        Assert.Contains(memberships, x => x.HouseholdId == personal.Id && x.Role == HouseholdRole.Owner);
         Assert.Equal(HouseholdInvitationStatus.Accepted, invitation.Status);
         Assert.Equal(result.Id, invitation.AcceptedByUserId);
         Assert.NotNull(invitation.AcceptedAtUtc);
