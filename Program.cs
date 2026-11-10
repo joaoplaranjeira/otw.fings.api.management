@@ -99,6 +99,7 @@ builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
 builder.Services.AddScoped<IHouseholdInvitationRepository, HouseholdInvitationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFinanceService, FinanceService>();
+builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<IHouseholdInvitationService, HouseholdInvitationService>();
 builder.Services.AddScoped<IReceiptParser, OpenAiReceiptParser>();
 builder.Services.AddScoped<IReceiptParseReviewService, ReceiptParseReviewService>();

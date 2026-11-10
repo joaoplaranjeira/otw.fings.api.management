@@ -37,6 +37,15 @@ public interface IReceiptParser
     Task<ReceiptParseResponse> ParseAsync(Guid householdId, long userId, Stream image, string contentType, long length, bool acceptLowQuality, CancellationToken cancellationToken);
 }
 
+public interface IInsightsService
+{
+    Task<HouseholdInsightsResponse> GetInsightsAsync(
+        Guid householdId,
+        long userId,
+        DateOnly month,
+        CancellationToken cancellationToken);
+}
+
 public interface IReceiptParseReviewService
 {
     Task<ReceiptParseHistoryItemResponse> ValidateAsync(

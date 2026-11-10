@@ -25,6 +25,7 @@
 - `GET/POST /api/households/{householdId}/recurring-expenses`
 - `POST /api/households/{householdId}/recurring-expenses/{recurringExpenseId}/materialize` — cria imediatamente todas as ocorrências vencidas da regra, sem duplicar movimentos existentes.
 - `GET /api/households/{householdId}/dashboard/{year}/{month}`
+- `GET /api/households/{householdId}/insights/{year}/{month}` — devolve insights financeiros explicáveis, com métricas, confiança e filtros de detalhe.
 - `POST /api/households/{householdId}/receipts/parse` — campo multipart `file`; não persiste o ficheiro.
 
 Todas as rotas autenticadas esperam `Authorization: Bearer {token}`.

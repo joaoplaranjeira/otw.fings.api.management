@@ -224,6 +224,61 @@ public sealed record CategoryBudgetStatusResponse(
     decimal Spent,
     decimal? Available);
 
+public enum InsightType
+{
+    BudgetPace = 1,
+    SpendingTrend = 2,
+    SpendingDriver = 3,
+    UnusualExpense = 4,
+    SmallExpenses = 5,
+    MerchantConcentration = 6,
+    RecurringCommitments = 7,
+    PotentialSubscriptions = 8,
+    BudgetAccuracy = 9,
+    DataQuality = 10
+}
+
+public enum InsightSeverity
+{
+    Information = 1,
+    Positive = 2,
+    Warning = 3,
+    Critical = 4
+}
+
+public sealed record InsightMetricResponse(
+    string Key,
+    string Label,
+    decimal Value,
+    string Unit);
+
+public sealed record InsightExpenseFilterResponse(
+    DateOnly From,
+    DateOnly To,
+    Guid? CategoryId = null,
+    Guid? SubcategoryId = null,
+    string? MerchantName = null,
+    decimal? MaximumAmount = null,
+    ExpenseOrigin? Origin = null);
+
+public sealed record InsightResponse(
+    string Id,
+    InsightType Type,
+    InsightSeverity Severity,
+    string Title,
+    string Explanation,
+    decimal Confidence,
+    int SampleSize,
+    IReadOnlyList<InsightMetricResponse> Metrics,
+    InsightExpenseFilterResponse? ExpenseFilter = null);
+
+public sealed record HouseholdInsightsResponse(
+    DateOnly Month,
+    DateTimeOffset GeneratedAtUtc,
+    string Currency,
+    int HistoryMonths,
+    IReadOnlyList<InsightResponse> Insights);
+
 public sealed record ReceiptLineParseResponse(
     string Description,
     decimal? Quantity,
