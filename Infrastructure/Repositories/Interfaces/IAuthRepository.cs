@@ -16,6 +16,7 @@ public interface IAuthRepository
         IReadOnlyList<Household> newHouseholds,
         IReadOnlyList<HouseholdMember> memberships,
         IReadOnlyList<Category> categories,
+        IReadOnlyList<ProductType> productTypes,
         HouseholdInvitation? invitation,
         DateTimeOffset? invitationAcceptedAt,
         CancellationToken cancellationToken);

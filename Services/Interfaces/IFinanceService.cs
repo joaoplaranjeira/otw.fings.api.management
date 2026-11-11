@@ -15,6 +15,9 @@ public interface IFinanceService
     Task<CategoryResponse> UpdateCategoryAsync(Guid householdId, Guid categoryId, long userId, UpdateCategoryRequest request, CancellationToken cancellationToken);
     Task<SubcategoryResponse> CreateSubcategoryAsync(Guid householdId, Guid categoryId, long userId, CreateSubcategoryRequest request, CancellationToken cancellationToken);
     Task<SubcategoryResponse> UpdateSubcategoryAsync(Guid householdId, Guid categoryId, Guid subcategoryId, long userId, UpdateSubcategoryRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ProductTypeResponse>> GetProductTypesAsync(Guid householdId, long userId, bool includeInactive, CancellationToken cancellationToken);
+    Task<ProductTypeResponse> CreateProductTypeAsync(Guid householdId, long userId, CreateProductTypeRequest request, CancellationToken cancellationToken);
+    Task<ProductTypeResponse> UpdateProductTypeAsync(Guid householdId, Guid productTypeId, long userId, UpdateProductTypeRequest request, CancellationToken cancellationToken);
     Task<BudgetPeriodResponse> CreateBudgetAsync(Guid householdId, long userId, CreateBudgetPeriodRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<BudgetPeriodResponse>> GetBudgetsAsync(Guid householdId, long userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<IncomeResponse>> GetIncomesAsync(Guid householdId, long userId, DateOnly from, DateOnly to, CancellationToken cancellationToken);

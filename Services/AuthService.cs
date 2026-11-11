@@ -188,7 +188,10 @@ public sealed class AuthService(
             }
         };
         var categories = new List<Category>();
-        categories.AddRange(StandardCategoryCatalog.CreateFor(personalHousehold.Id));
+        var productTypes = new List<ProductType>();
+        var personalCategories = StandardCategoryCatalog.CreateFor(personalHousehold.Id);
+        categories.AddRange(personalCategories);
+        productTypes.AddRange(StandardProductTypeCatalog.CreateFor(personalHousehold.Id, personalCategories));
 
         if (!string.IsNullOrWhiteSpace(householdName))
         {
@@ -203,7 +206,9 @@ public sealed class AuthService(
                 HouseholdId = sharedHousehold.Id,
                 Role = HouseholdRole.Owner
             });
-            categories.AddRange(StandardCategoryCatalog.CreateFor(sharedHousehold.Id));
+            var sharedCategories = StandardCategoryCatalog.CreateFor(sharedHousehold.Id);
+            categories.AddRange(sharedCategories);
+            productTypes.AddRange(StandardProductTypeCatalog.CreateFor(sharedHousehold.Id, sharedCategories));
         }
         else if (invitation is not null)
         {
@@ -219,6 +224,7 @@ public sealed class AuthService(
             newHouseholds,
             memberships,
             categories,
+            productTypes,
             invitation,
             invitation is null ? null : nowOffset,
             cancellationToken);

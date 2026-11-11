@@ -22,6 +22,7 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
     public DbSet<HouseholdInvitation> HouseholdInvitations => Set<HouseholdInvitation>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
+    public DbSet<ProductType> ProductTypes => Set<ProductType>();
     public DbSet<BudgetPeriod> BudgetPeriods => Set<BudgetPeriod>();
     public DbSet<BudgetCategoryAllocation> BudgetCategoryAllocations => Set<BudgetCategoryAllocation>();
     public DbSet<Income> Incomes => Set<Income>();
@@ -125,6 +126,21 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
             entity.HasIndex(x => new { x.CategoryId, x.Name }).IsUnique();
             entity.HasOne(x => x.Category).WithMany(x => x.Subcategories)
                 .HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductType>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(250);
+            entity.Property(x => x.NormalizedName).HasMaxLength(250);
+            entity.ToTable("ProductTypes");
+            entity.HasIndex(x => new { x.HouseholdId, x.NormalizedName }).IsUnique();
+            entity.HasIndex(x => new { x.HouseholdId, x.IsActive });
+            entity.HasOne(x => x.Household).WithMany().HasForeignKey(x => x.HouseholdId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Subcategory).WithMany().HasForeignKey(x => x.SubcategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<BudgetPeriod>(entity =>
@@ -238,8 +254,8 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
 
         modelBuilder.Entity<ShoppingListItem>(entity =>
         {
-            entity.Property(x => x.ProductName).HasMaxLength(250);
-            entity.Property(x => x.NormalizedProductName).HasMaxLength(250);
+            entity.Property(x => x.ProductTypeName).HasMaxLength(250);
+            entity.Property(x => x.NormalizedProductTypeName).HasMaxLength(250);
             entity.Property(x => x.Brand).HasMaxLength(150);
             entity.Property(x => x.Variant).HasMaxLength(150);
             entity.Property(x => x.Quantity).HasPrecision(18, 3);
@@ -248,9 +264,11 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
             entity.Property(x => x.Notes).HasMaxLength(500);
             entity.Property(x => x.DetectionConfidence).HasPrecision(5, 4);
             entity.HasIndex(x => new { x.ShoppingListId, x.Status });
-            entity.HasIndex(x => x.NormalizedProductName);
+            entity.HasIndex(x => x.NormalizedProductTypeName);
             entity.HasOne(x => x.ShoppingList).WithMany(x => x.Items)
                 .HasForeignKey(x => x.ShoppingListId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ProductType).WithMany(x => x.ShoppingListItems)
+                .HasForeignKey(x => x.ProductTypeId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.AddedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.CompletedByUserId)

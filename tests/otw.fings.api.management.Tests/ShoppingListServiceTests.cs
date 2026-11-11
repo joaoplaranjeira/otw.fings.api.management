@@ -26,13 +26,13 @@ public sealed class ShoppingListServiceTests
             household.Id,
             supermarket.Id,
             1,
-            new("Leite", Brand: "Mimosa", Quantity: 2, Unit: "un", ExpectedPrice: 1.29m),
+            new(ProductTypeId(db, "Leite"), Brand: "Mimosa", Quantity: 2, Unit: "un", ExpectedPrice: 1.29m),
             CancellationToken.None);
         await service.AddItemAsync(
             household.Id,
             party.Id,
             1,
-            new("Gelo", Quantity: 3, Unit: "sacos", Notes: "Comprar no fim"),
+            new(ProductTypeId(db, "Gelo"), Quantity: 3, Unit: "sacos", Notes: "Comprar no fim"),
             CancellationToken.None);
 
         var lists = await service.GetListsAsync(
@@ -62,13 +62,33 @@ public sealed class ShoppingListServiceTests
         var result = await service.AddItemFromImageAsync(
             household.Id, list.Id, 1, image, "image/jpeg", image.Length, CancellationToken.None);
 
-        Assert.Equal("Leite", result.Item.ProductName);
+        Assert.Equal("Leite", result.Item.ProductTypeName);
+        Assert.Equal(ProductTypeId(db, "Leite"), result.Item.ProductTypeId);
         Assert.Equal("Mimosa", result.Item.Brand);
         Assert.Equal(1, result.Item.Quantity);
         Assert.Null(result.Item.ExpectedPrice);
         Assert.Equal(ShoppingListItemSource.ProductPhoto, result.Item.Source);
         Assert.Equal(0.96m, result.Item.DetectionConfidence);
-        Assert.Equal("LEITE", await db.ShoppingListItems.Select(x => x.NormalizedProductName).SingleAsync());
+        Assert.Equal("LEITE", await db.ShoppingListItems.Select(x => x.NormalizedProductTypeName).SingleAsync());
+    }
+
+    [Fact]
+    public async Task ProductPhotoDoesNotRequireExistingOrPreselectedProductType()
+    {
+        await using var db = CreateDbContext();
+        var household = await SeedAsync(db);
+        var recognizer = new StubProductImageRecognizer(new(
+            "Bolachas", "Triunfo", null, 1, "embalagem", 0.91m));
+        var service = CreateService(db, recognizer);
+        var list = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
+
+        await using var image = new MemoryStream([1, 2, 3]);
+        var result = await service.AddItemFromImageAsync(
+            household.Id, list.Id, 1, image, "image/jpeg", image.Length, CancellationToken.None);
+
+        Assert.Null(result.Item.ProductTypeId);
+        Assert.Equal("Bolachas", result.Item.ProductTypeName);
+        Assert.Equal("Triunfo", result.Item.Brand);
     }
 
     [Fact]
@@ -80,11 +100,34 @@ public sealed class ShoppingListServiceTests
         var list = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
 
         var item = await service.AddItemAsync(
-            household.Id, list.Id, 1, new("Sal"), CancellationToken.None);
+            household.Id, list.Id, 1, new(ProductTypeId(db, "Sal")), CancellationToken.None);
 
         Assert.Null(item.Brand);
         Assert.Null(item.Quantity);
         Assert.Null(item.ExpectedPrice);
+    }
+
+    [Fact]
+    public async Task ProductTypeSelectionCreatesItemAndOptionalDetailsStayOnItem()
+    {
+        await using var db = CreateDbContext();
+        var household = await SeedAsync(db);
+        var service = CreateService(db);
+        var list = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
+
+        var item = await service.AddItemAsync(
+            household.Id,
+            list.Id,
+            1,
+            new(ProductTypeId(db, "Leite"), Brand: "Mimosa", Quantity: 2, Unit: "un", ExpectedPrice: 1.49m),
+            CancellationToken.None);
+
+        Assert.Equal(ProductTypeId(db, "Leite"), item.ProductTypeId);
+        Assert.Equal("Leite", item.ProductTypeName);
+        Assert.Equal("Mimosa", item.Brand);
+        Assert.Equal(2, item.Quantity);
+        Assert.Equal("un", item.Unit);
+        Assert.Equal(1.49m, item.ExpectedPrice);
     }
 
     [Fact]
@@ -96,9 +139,9 @@ public sealed class ShoppingListServiceTests
         var weekly = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
         var reserve = await service.CreateListAsync(household.Id, 1, new("Reserva"), CancellationToken.None);
         var weeklyItem = await service.AddItemAsync(
-            household.Id, weekly.Id, 1, new("Leite"), CancellationToken.None);
+            household.Id, weekly.Id, 1, new(ProductTypeId(db, "Leite")), CancellationToken.None);
         var reserveItem = await service.AddItemAsync(
-            household.Id, reserve.Id, 1, new("Leite"), CancellationToken.None);
+            household.Id, reserve.Id, 1, new(ProductTypeId(db, "Leite")), CancellationToken.None);
         var category = await db.Categories.SingleAsync();
         var finance = new FinanceService(
             new FinanceRepository(db),
@@ -148,7 +191,8 @@ public sealed class ShoppingListServiceTests
         var household = await SeedAsync(db);
         var service = CreateService(db);
         var list = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
-        var item = await service.AddItemAsync(household.Id, list.Id, 1, new("Arroz"), CancellationToken.None);
+        var item = await service.AddItemAsync(
+            household.Id, list.Id, 1, new(ProductTypeId(db, "Arroz")), CancellationToken.None);
         var expense = await CreateExpenseAsync(db, household.Id, "Arroz agulha");
         await service.DetectMatchesAsync(expense, CancellationToken.None);
         var match = Assert.Single(await service.GetExpenseMatchesAsync(
@@ -173,7 +217,7 @@ public sealed class ShoppingListServiceTests
             household.Id,
             list.Id,
             1,
-            new("Leite", Quantity: 3, Unit: "un"),
+            new(ProductTypeId(db, "Leite"), Quantity: 3, Unit: "un"),
             CancellationToken.None);
         var expense = await CreateExpenseAsync(db, household.Id, "Leite Mimosa", quantity: 1);
         await service.DetectMatchesAsync(expense, CancellationToken.None);
@@ -200,7 +244,7 @@ public sealed class ShoppingListServiceTests
         var service = CreateService(db);
         var list = await service.CreateListAsync(household.Id, 1, new("Semanal"), CancellationToken.None);
         await service.AddItemAsync(
-            household.Id, list.Id, 1, new("Arroz", Quantity: 2), CancellationToken.None);
+            household.Id, list.Id, 1, new(ProductTypeId(db, "Arroz"), Quantity: 2), CancellationToken.None);
         var expense = await CreateExpenseAsync(db, household.Id, "Arroz agulha");
         await service.DetectMatchesAsync(expense, CancellationToken.None);
         var match = Assert.Single(await service.GetExpenseMatchesAsync(
@@ -283,14 +327,22 @@ public sealed class ShoppingListServiceTests
             IsActive = true
         };
         var household = new Household { Name = "Casa" };
+        var category = new Category { HouseholdId = household.Id, Name = "Alimentação" };
         db.AddRange(
             user,
             household,
             new HouseholdMember { HouseholdId = household.Id, UserId = user.Id, Role = HouseholdRole.Owner },
-            new Category { HouseholdId = household.Id, Name = "Alimentação" });
+            category,
+            new ProductType { HouseholdId = household.Id, CategoryId = category.Id, Name = "Leite", NormalizedName = "LEITE" },
+            new ProductType { HouseholdId = household.Id, CategoryId = category.Id, Name = "Gelo", NormalizedName = "GELO" },
+            new ProductType { HouseholdId = household.Id, CategoryId = category.Id, Name = "Sal", NormalizedName = "SAL" },
+            new ProductType { HouseholdId = household.Id, CategoryId = category.Id, Name = "Arroz", NormalizedName = "ARROZ" });
         await db.SaveChangesAsync();
         return household;
     }
+
+    private static Guid ProductTypeId(FingsDbContext db, string name) =>
+        db.ProductTypes.Single(x => x.Name == name).Id;
 
     private static FingsDbContext CreateDbContext()
     {

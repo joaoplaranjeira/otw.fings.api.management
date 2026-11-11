@@ -1,17 +1,84 @@
 # Integração frontend — listas de compras
 
-Este módulo permite manter várias listas de compras ativas no mesmo agregado, adicionar produtos manualmente ou a partir de uma fotografia e rever produtos encontrados numa nova despesa antes de os marcar como comprados.
+Este módulo permite manter um catálogo parametrizável de tipos de produto por agregado, várias listas de compras ativas, adicionar produtos manualmente ou a partir de uma fotografia e rever produtos encontrados numa nova despesa antes de os marcar como comprados.
 
 ## Conceitos e estados
 
 - Uma lista tem estado `Active` ou `Archived`.
 - Um produto tem estado `Active`, `Purchased` ou `Removed`.
 - Uma correspondência entre uma parcela de despesa e um produto tem estado `Pending`, `Approved` ou `Rejected`.
+- Um tipo de produto, por exemplo `Arroz`, `Água` ou `Champô`, pertence obrigatoriamente a uma categoria e pode pertencer a uma subcategoria.
+- Marca, quantidade, unidade, preço expectável, variante e notas pertencem ao item concreto da lista, não ao tipo.
+- Um item criado manualmente referencia obrigatoriamente um tipo através de `productTypeId`.
+- Um item criado por fotografia não exige pré-seleção; o backend tenta associar automaticamente o tipo reconhecido e pode devolver `productTypeId: null` quando ainda não existir no catálogo.
 - Aprovar uma correspondência desconta a quantidade comprada. O produto só passa para `Purchased` quando a quantidade em falta chega a zero; numa compra parcial permanece `Active` com a quantidade restante.
 - Rejeitar uma correspondência mantém o produto `Active`.
 - Nunca é removido um produto automaticamente. A decisão final é sempre do utilizador.
 
 Os enums são serializados pelo nome, não pelo respetivo valor numérico.
+
+## Tipos de produto parametrizados
+
+Os tipos são configurados por agregado, tal como as categorias. Cada novo agregado recebe automaticamente 17 tipos comuns associados às categorias e subcategorias standard: leite, pão, ovos, arroz, massa, água, fruta, legumes, carne, peixe, azeite, café, papel higiénico, detergente da roupa, detergente da loiça, champô e pasta de dentes.
+
+- No registo de um utilizador, os tipos são criados no agregado pessoal e também no agregado partilhado criado nesse registo, quando aplicável.
+- As migrações inserem os mesmos tipos em todos os agregados já existentes.
+- Aceitar um convite não duplica tipos no agregado partilhado, porque o catálogo pertence ao agregado e não a cada membro.
+
+### Listar tipos
+
+```http
+GET /api/households/{householdId}/product-types?includeInactive=false
+```
+
+Resposta:
+
+```json
+[
+  {
+    "id": "e2499734-98aa-44c9-aa64-a788e91103bd",
+    "name": "Leite",
+    "categoryId": "3c13d98f-f350-4742-9363-632d378095dc",
+    "categoryName": "Alimentação",
+    "subcategoryId": "ab517de1-8a09-4b63-bde3-334ed170ea53",
+    "subcategoryName": "Supermercado",
+    "isActive": true
+  }
+]
+```
+
+Por omissão são devolvidos apenas tipos ativos. Use `includeInactive=true` no ecrã de gestão de parametrizações.
+
+### Criar um tipo
+
+```http
+POST /api/households/{householdId}/product-types
+Content-Type: application/json
+
+{
+  "name": "Iogurte",
+  "categoryId": "3c13d98f-f350-4742-9363-632d378095dc",
+  "subcategoryId": "ab517de1-8a09-4b63-bde3-334ed170ea53"
+}
+```
+
+`name` e `categoryId` são obrigatórios. A subcategoria é opcional e, quando indicada, tem de pertencer à categoria selecionada. Não podem existir dois tipos com o mesmo nome normalizado no mesmo agregado.
+
+### Alterar, ativar ou desativar
+
+```http
+PATCH /api/households/{householdId}/product-types/{productTypeId}
+Content-Type: application/json
+
+{
+  "name": "Iogurte",
+  "categoryId": "3c13d98f-f350-4742-9363-632d378095dc",
+  "subcategoryId": "ab517de1-8a09-4b63-bde3-334ed170ea53",
+  "isActive": true
+}
+```
+
+Tipos inativos deixam de poder ser escolhidos manualmente para novas entradas, mas os itens existentes mantêm os dados e a referência histórica.
 
 ## Rotas
 
@@ -39,7 +106,8 @@ Resposta:
     "items": [
       {
         "id": "f964e70a-dd9f-43ef-bf42-15119779e50c",
-        "productName": "Leite",
+        "productTypeId": "e2499734-98aa-44c9-aa64-a788e91103bd",
+        "productTypeName": "Leite",
         "brand": "Mimosa",
         "variant": null,
         "quantity": 2,
@@ -96,12 +164,14 @@ Retorna `204 No Content`. O arquivo é lógico e mantém os produtos e o histór
 
 ### Adicionar um produto manualmente
 
+O primeiro passo da interface deve ser a escolha obrigatória do tipo. Depois podem ser apresentados os restantes campos opcionais:
+
 ```http
 POST /api/households/{householdId}/shopping-lists/{listId}/items
 Content-Type: application/json
 
 {
-  "productName": "Leite",
+  "productTypeId": "e2499734-98aa-44c9-aa64-a788e91103bd",
   "brand": "Mimosa",
   "quantity": 2,
   "unit": "un",
@@ -116,9 +186,11 @@ O payload mínimo é:
 
 ```json
 {
-  "productName": "Leite"
+  "productTypeId": "e2499734-98aa-44c9-aa64-a788e91103bd"
 }
 ```
+
+Um `productTypeId` inativo, inexistente ou pertencente a outro agregado é rejeitado. A adição manual não aceita nomes livres: novos tipos devem ser criados primeiro na gestão de parametrizações.
 
 ### Adicionar através de fotografia
 
@@ -129,7 +201,7 @@ Content-Type: multipart/form-data
 file=<JPEG, PNG ou WebP>
 ```
 
-O campo multipart chama-se obrigatoriamente `file`. O limite atual é 10 MiB. A API valida o MIME type e a assinatura binária, envia a imagem para a OpenAI e cria imediatamente o produto detetado.
+O campo multipart chama-se obrigatoriamente `file`. O limite atual é 10 MiB. Não é enviado `productTypeId`: a API valida a imagem, pede à OpenAI o tipo genérico e tenta associá-lo automaticamente ao catálogo do agregado. A fotografia continua válida quando não existir correspondência; nesse caso o item é criado com `productTypeId: null` e com o nome reconhecido.
 
 Resposta `201 Created`:
 
@@ -137,7 +209,8 @@ Resposta `201 Created`:
 {
   "item": {
     "id": "f964e70a-dd9f-43ef-bf42-15119779e50c",
-    "productName": "Leite",
+    "productTypeId": "e2499734-98aa-44c9-aa64-a788e91103bd",
+    "productTypeName": "Leite",
     "brand": "Mimosa",
     "variant": "Meio gordo",
     "quantity": 1,
@@ -151,7 +224,7 @@ Resposta `201 Created`:
     "completedAtUtc": null
   },
   "recognition": {
-    "productName": "Leite",
+    "productTypeName": "Leite",
     "brand": "Mimosa",
     "variant": "Meio gordo",
     "suggestedQuantity": 1,
@@ -175,7 +248,7 @@ PATCH /api/households/{householdId}/shopping-lists/{listId}/items/{itemId}
 Content-Type: application/json
 
 {
-  "productName": "Leite sem lactose",
+  "productTypeId": "e2499734-98aa-44c9-aa64-a788e91103bd",
   "brand": "Mimosa",
   "quantity": 2,
   "unit": "un",
@@ -219,7 +292,7 @@ Resposta:
     "shoppingListId": "a19a4708-2275-4e50-a856-6682f35ba995",
     "shoppingListName": "Compras semanais",
     "shoppingListItemId": "f964e70a-dd9f-43ef-bf42-15119779e50c",
-    "productName": "Leite",
+    "productTypeName": "Leite",
     "expenseId": "c5e99483-32ec-4385-a267-0ae5b2b37fda",
     "expenseLineId": "00110c07-ecaa-4725-ab66-487062767755",
     "expenseLineDescription": "LEITE MIMOSA MG 1L",

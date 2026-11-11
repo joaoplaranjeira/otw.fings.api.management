@@ -36,11 +36,13 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
         Household household,
         HouseholdMember membership,
         IReadOnlyList<Category> categories,
+        IReadOnlyList<ProductType> productTypes,
         CancellationToken cancellationToken)
     {
         dbContext.Households.Add(household);
         dbContext.HouseholdMembers.Add(membership);
         dbContext.Categories.AddRange(categories);
+        dbContext.ProductTypes.AddRange(productTypes);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -125,6 +127,46 @@ public sealed class FinanceRepository(FingsDbContext dbContext) : IFinanceReposi
     public async Task AddSubcategoryAsync(Subcategory subcategory, CancellationToken cancellationToken)
     {
         dbContext.Subcategories.Add(subcategory);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProductType>> GetProductTypesAsync(
+        Guid householdId,
+        bool includeInactive,
+        CancellationToken cancellationToken) =>
+        await dbContext.ProductTypes.AsNoTracking()
+            .Include(x => x.Category)
+            .Include(x => x.Subcategory)
+            .Where(x => x.HouseholdId == householdId && (includeInactive || x.IsActive))
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+    public Task<ProductType?> GetProductTypeAsync(
+        Guid householdId,
+        Guid productTypeId,
+        bool activeOnly,
+        CancellationToken cancellationToken) =>
+        dbContext.ProductTypes
+            .Include(x => x.Category)
+            .Include(x => x.Subcategory)
+            .SingleOrDefaultAsync(
+                x => x.HouseholdId == householdId && x.Id == productTypeId && (!activeOnly || x.IsActive),
+                cancellationToken);
+
+    public Task<bool> HasProductTypeNameAsync(
+        Guid householdId,
+        string normalizedName,
+        Guid? exceptProductTypeId,
+        CancellationToken cancellationToken) =>
+        dbContext.ProductTypes.AnyAsync(
+            x => x.HouseholdId == householdId &&
+                 x.NormalizedName == normalizedName &&
+                 (!exceptProductTypeId.HasValue || x.Id != exceptProductTypeId.Value),
+            cancellationToken);
+
+    public async Task AddProductTypeAsync(ProductType productType, CancellationToken cancellationToken)
+    {
+        dbContext.ProductTypes.Add(productType);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

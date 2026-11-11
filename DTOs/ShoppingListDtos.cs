@@ -9,7 +9,7 @@ public sealed record UpdateShoppingListRequest(
     ShoppingListStatus Status);
 
 public sealed record AddShoppingListItemRequest(
-    [Required, MaxLength(250)] string ProductName,
+    Guid ProductTypeId,
     [MaxLength(150)] string? Brand = null,
     decimal? Quantity = null,
     [MaxLength(50)] string? Unit = null,
@@ -17,7 +17,8 @@ public sealed record AddShoppingListItemRequest(
     [MaxLength(500)] string? Notes = null);
 
 public sealed record UpdateShoppingListItemRequest(
-    [Required, MaxLength(250)] string ProductName,
+    Guid? ProductTypeId = null,
+    [MaxLength(250)] string? ProductTypeName = null,
     [MaxLength(150)] string? Brand = null,
     decimal? Quantity = null,
     [MaxLength(50)] string? Unit = null,
@@ -26,7 +27,8 @@ public sealed record UpdateShoppingListItemRequest(
 
 public sealed record ShoppingListItemResponse(
     Guid Id,
-    string ProductName,
+    Guid? ProductTypeId,
+    string ProductTypeName,
     string? Brand,
     string? Variant,
     decimal? Quantity,
@@ -48,7 +50,7 @@ public sealed record ShoppingListResponse(
     IReadOnlyList<ShoppingListItemResponse> Items);
 
 public sealed record ProductRecognitionResponse(
-    string ProductName,
+    string ProductTypeName,
     string? Brand,
     string? Variant,
     decimal? SuggestedQuantity,
@@ -64,7 +66,7 @@ public sealed record ShoppingListExpenseMatchResponse(
     Guid ShoppingListId,
     string ShoppingListName,
     Guid ShoppingListItemId,
-    string ProductName,
+    string ProductTypeName,
     Guid ExpenseId,
     Guid ExpenseLineId,
     string ExpenseLineDescription,

@@ -36,7 +36,8 @@ public sealed class FinanceService(
             Role = HouseholdRole.Owner
         };
         var categories = StandardCategoryCatalog.CreateFor(household.Id);
-        await repository.AddHouseholdAsync(household, membership, categories, cancellationToken);
+        var productTypes = StandardProductTypeCatalog.CreateFor(household.Id, categories);
+        await repository.AddHouseholdAsync(household, membership, categories, productTypes, cancellationToken);
         return new(
             household.Id,
             household.Name,
@@ -329,6 +330,70 @@ public sealed class FinanceService(
         subcategory.Name = request.Name.Trim();
         await repository.SaveChangesAsync(cancellationToken);
         return new(subcategory.Id, subcategory.Name, subcategory.IsActive);
+    }
+
+    public async Task<IReadOnlyList<ProductTypeResponse>> GetProductTypesAsync(
+        Guid householdId,
+        long userId,
+        bool includeInactive,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, false, cancellationToken);
+        return (await repository.GetProductTypesAsync(householdId, includeInactive, cancellationToken))
+            .Select(Map).ToArray();
+    }
+
+    public async Task<ProductTypeResponse> CreateProductTypeAsync(
+        Guid householdId,
+        long userId,
+        CreateProductTypeRequest request,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, true, cancellationToken);
+        var (category, subcategory) = await ResolveProductCategoryAsync(
+            householdId, request.CategoryId, request.SubcategoryId, cancellationToken);
+        var name = RequiredProductTypeName(request.Name);
+        var normalizedName = ProductTypeNameNormalizer.Normalize(name);
+        await EnsureUniqueProductTypeNameAsync(householdId, normalizedName, null, cancellationToken);
+        var productType = new ProductType
+        {
+            HouseholdId = householdId,
+            CategoryId = category.Id,
+            SubcategoryId = subcategory?.Id,
+            Name = name,
+            NormalizedName = normalizedName,
+            Category = category,
+            Subcategory = subcategory
+        };
+        await repository.AddProductTypeAsync(productType, cancellationToken);
+        return Map(productType);
+    }
+
+    public async Task<ProductTypeResponse> UpdateProductTypeAsync(
+        Guid householdId,
+        Guid productTypeId,
+        long userId,
+        UpdateProductTypeRequest request,
+        CancellationToken cancellationToken)
+    {
+        await EnsureMemberAsync(householdId, userId, true, cancellationToken);
+        var productType = await repository.GetProductTypeAsync(householdId, productTypeId, false, cancellationToken)
+            ?? throw new NotFoundException("Tipo de produto não encontrado.");
+        var (category, subcategory) = await ResolveProductCategoryAsync(
+            householdId, request.CategoryId, request.SubcategoryId, cancellationToken);
+        var name = RequiredProductTypeName(request.Name);
+        var normalizedName = ProductTypeNameNormalizer.Normalize(name);
+        await EnsureUniqueProductTypeNameAsync(householdId, normalizedName, productTypeId, cancellationToken);
+
+        productType.CategoryId = category.Id;
+        productType.SubcategoryId = subcategory?.Id;
+        productType.Name = name;
+        productType.NormalizedName = normalizedName;
+        productType.IsActive = request.IsActive;
+        productType.Category = category;
+        productType.Subcategory = subcategory;
+        await repository.SaveChangesAsync(cancellationToken);
+        return Map(productType);
     }
 
     public async Task<BudgetPeriodResponse> CreateBudgetAsync(
@@ -921,6 +986,48 @@ public sealed class FinanceService(
         category.IsActive,
         category.Subcategories.Where(x => x.IsActive).OrderBy(x => x.Name)
             .Select(x => new SubcategoryResponse(x.Id, x.Name, x.IsActive)).ToArray());
+
+    private static ProductTypeResponse Map(ProductType productType) => new(
+        productType.Id,
+        productType.Name,
+        productType.CategoryId,
+        productType.Category.Name,
+        productType.SubcategoryId,
+        productType.Subcategory?.Name,
+        productType.IsActive);
+
+    private async Task<(Category Category, Subcategory? Subcategory)> ResolveProductCategoryAsync(
+        Guid householdId,
+        Guid categoryId,
+        Guid? subcategoryId,
+        CancellationToken cancellationToken)
+    {
+        var category = await repository.GetCategoryAsync(householdId, categoryId, cancellationToken)
+            ?? throw new ValidationException("A categoria do produto não pertence ao agregado.");
+        var subcategory = subcategoryId.HasValue
+            ? await repository.GetSubcategoryAsync(category.Id, subcategoryId.Value, cancellationToken)
+                ?? throw new ValidationException("A subcategoria do produto não pertence à categoria indicada.")
+            : null;
+        return (category, subcategory);
+    }
+
+    private async Task EnsureUniqueProductTypeNameAsync(
+        Guid householdId,
+        string normalizedName,
+        Guid? exceptProductTypeId,
+        CancellationToken cancellationToken)
+    {
+        if (await repository.HasProductTypeNameAsync(
+            householdId, normalizedName, exceptProductTypeId, cancellationToken))
+        {
+            throw new ConflictException("Já existe um tipo de produto com este nome no agregado.");
+        }
+    }
+
+    private static string RequiredProductTypeName(string? name) =>
+        string.IsNullOrWhiteSpace(name)
+            ? throw new ValidationException("O nome do tipo de produto é obrigatório.")
+            : name.Trim();
 
     private static ExpenseResponse Map(Expense expense) => new(
         expense.Id, expense.CreatedByUserId, expense.Date, expense.Amount, expense.Description,

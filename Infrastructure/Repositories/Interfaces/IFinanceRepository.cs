@@ -10,6 +10,7 @@ public interface IFinanceRepository
         Household household,
         HouseholdMember membership,
         IReadOnlyList<Category> categories,
+        IReadOnlyList<ProductType> productTypes,
         CancellationToken cancellationToken);
     Task<IReadOnlyList<HouseholdMemberResponse>> GetHouseholdMembersAsync(Guid householdId, CancellationToken cancellationToken);
     Task<HouseholdMember?> GetHouseholdMemberAsync(Guid householdId, Guid memberId, CancellationToken cancellationToken);
@@ -24,6 +25,10 @@ public interface IFinanceRepository
     Task<Subcategory?> GetSubcategoryAsync(Guid categoryId, Guid subcategoryId, CancellationToken cancellationToken);
     Task AddCategoryAsync(Category category, CancellationToken cancellationToken);
     Task AddSubcategoryAsync(Subcategory subcategory, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ProductType>> GetProductTypesAsync(Guid householdId, bool includeInactive, CancellationToken cancellationToken);
+    Task<ProductType?> GetProductTypeAsync(Guid householdId, Guid productTypeId, bool activeOnly, CancellationToken cancellationToken);
+    Task<bool> HasProductTypeNameAsync(Guid householdId, string normalizedName, Guid? exceptProductTypeId, CancellationToken cancellationToken);
+    Task AddProductTypeAsync(ProductType productType, CancellationToken cancellationToken);
     Task<bool> HasOverlappingBudgetAsync(Guid householdId, DateOnly startMonth, DateOnly endMonth, CancellationToken cancellationToken);
     Task AddBudgetAsync(BudgetPeriod budget, IReadOnlyList<Income> incomes, CancellationToken cancellationToken);
     Task<IReadOnlyList<BudgetPeriod>> GetBudgetsAsync(Guid householdId, CancellationToken cancellationToken);

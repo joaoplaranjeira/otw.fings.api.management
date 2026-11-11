@@ -135,6 +135,7 @@ public sealed class AuthServiceTests
         Assert.Equal(result.Id, membership.UserId);
         Assert.Equal(HouseholdRole.Owner, membership.Role);
         Assert.NotEmpty(db.Categories);
+        Assert.Equal(17, await db.ProductTypes.CountAsync());
     }
 
     [Fact]
@@ -156,6 +157,7 @@ public sealed class AuthServiceTests
         Assert.Equal("Família Santos", shared.Name);
         Assert.Equal(2, await db.HouseholdMembers.CountAsync(x => x.UserId == result.Id));
         Assert.Equal(26, await db.Categories.CountAsync());
+        Assert.Equal(34, await db.ProductTypes.CountAsync());
     }
 
     [Fact]

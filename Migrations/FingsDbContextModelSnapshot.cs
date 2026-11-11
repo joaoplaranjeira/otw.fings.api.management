@@ -971,6 +971,54 @@ namespace otw.fings.api.management.Migrations
                     b.ToTable("OtpCodes");
                 });
 
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ProductType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<Guid?>("SubcategoryId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("SubcategoryId");
+
+                    b.HasIndex("HouseholdId", "IsActive");
+
+                    b.HasIndex("HouseholdId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("ProductTypes", (string)null);
+                });
+
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.PushSubscription", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1298,7 +1346,7 @@ namespace otw.fings.api.management.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("NormalizedProductName")
+                    b.Property<string>("NormalizedProductTypeName")
                         .IsRequired()
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)");
@@ -1307,7 +1355,10 @@ namespace otw.fings.api.management.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
 
-                    b.Property<string>("ProductName")
+                    b.Property<Guid?>("ProductTypeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ProductTypeName")
                         .IsRequired()
                         .HasMaxLength(250)
                         .HasColumnType("varchar(250)");
@@ -1342,7 +1393,9 @@ namespace otw.fings.api.management.Migrations
 
                     b.HasIndex("CompletedByUserId");
 
-                    b.HasIndex("NormalizedProductName");
+                    b.HasIndex("NormalizedProductTypeName");
+
+                    b.HasIndex("ProductTypeId");
 
                     b.HasIndex("ShoppingListId", "Status");
 
@@ -1644,6 +1697,32 @@ namespace otw.fings.api.management.Migrations
                     b.Navigation("Notification");
                 });
 
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ProductType", b =>
+                {
+                    b.HasOne("otw.fings.api.management.Domain.Entities.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.Household", "Household")
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.Subcategory", "Subcategory")
+                        .WithMany()
+                        .HasForeignKey("SubcategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Household");
+
+                    b.Navigation("Subcategory");
+                });
+
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ReceiptParseRecord", b =>
                 {
                     b.HasOne("otw.fings.api.management.Domain.Entities.Household", "Household")
@@ -1759,11 +1838,18 @@ namespace otw.fings.api.management.Migrations
                         .HasForeignKey("CompletedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("otw.fings.api.management.Domain.Entities.ProductType", "ProductType")
+                        .WithMany("ShoppingListItems")
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("otw.fings.api.management.Domain.Entities.ShoppingList", "ShoppingList")
                         .WithMany("Items")
                         .HasForeignKey("ShoppingListId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ProductType");
 
                     b.Navigation("ShoppingList");
                 });
@@ -1817,6 +1903,11 @@ namespace otw.fings.api.management.Migrations
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.Notification", b =>
                 {
                     b.Navigation("Deliveries");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ProductType", b =>
+                {
+                    b.Navigation("ShoppingListItems");
                 });
 
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.RecurringExpense", b =>

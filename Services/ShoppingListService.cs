@@ -1,12 +1,10 @@
-using System.Globalization;
-using System.Text;
-using System.Text.RegularExpressions;
+using otw.fings.api.management.Domain.Catalogs;
 using otw.fings.api.management.Infrastructure.Repositories.Interfaces;
 using otw.fings.api.management.Services.Interfaces;
 
 namespace otw.fings.api.management.Services;
 
-public sealed partial class ShoppingListService(
+public sealed class ShoppingListService(
     IShoppingListRepository repository,
     IFinanceRepository financeRepository,
     IProductImageRecognizer imageRecognizer,
@@ -91,13 +89,16 @@ public sealed partial class ShoppingListService(
         await EnsureActiveListAsync(householdId, listId, cancellationToken);
         ValidateQuantity(request.Quantity);
         ValidateExpectedPrice(request.ExpectedPrice);
-        var name = RequiredText(request.ProductName, "O nome do produto é obrigatório.");
+        var productType = await financeRepository.GetProductTypeAsync(
+            householdId, request.ProductTypeId, true, cancellationToken)
+            ?? throw new ValidationException("O tipo de produto não pertence ao agregado ou está inativo.");
         var item = new ShoppingListItem
         {
             ShoppingListId = listId,
+            ProductTypeId = productType.Id,
             AddedByUserId = userId,
-            ProductName = name,
-            NormalizedProductName = Normalize(name),
+            ProductTypeName = productType.Name,
+            NormalizedProductTypeName = productType.NormalizedName,
             Brand = EmptyToNull(request.Brand),
             Quantity = request.Quantity,
             Unit = EmptyToNull(request.Unit),
@@ -120,16 +121,23 @@ public sealed partial class ShoppingListService(
         await EnsureMemberAsync(householdId, userId, true, cancellationToken);
         await EnsureActiveListAsync(householdId, listId, cancellationToken);
         var recognition = await imageRecognizer.RecognizeAsync(image, contentType, length, cancellationToken);
-        var quantity = recognition.SuggestedQuantity is > 0 ? recognition.SuggestedQuantity : null;
+        var normalizedRecognition = Normalize(recognition.ProductTypeName);
+        var productType = (await financeRepository.GetProductTypesAsync(householdId, false, cancellationToken))
+            .Select(type => new { ProductType = type, Confidence = Similarity(type.NormalizedName, normalizedRecognition) })
+            .Where(x => x.Confidence >= 0.72m)
+            .OrderByDescending(x => x.Confidence)
+            .Select(x => x.ProductType)
+            .FirstOrDefault();
         var item = new ShoppingListItem
         {
             ShoppingListId = listId,
+            ProductTypeId = productType?.Id,
             AddedByUserId = userId,
-            ProductName = recognition.ProductName.Trim(),
-            NormalizedProductName = Normalize(recognition.ProductName),
+            ProductTypeName = productType?.Name ?? recognition.ProductTypeName.Trim(),
+            NormalizedProductTypeName = productType?.NormalizedName ?? normalizedRecognition,
             Brand = EmptyToNull(recognition.Brand),
             Variant = EmptyToNull(recognition.Variant),
-            Quantity = quantity,
+            Quantity = recognition.SuggestedQuantity is > 0 ? recognition.SuggestedQuantity : null,
             Unit = EmptyToNull(recognition.SuggestedUnit),
             Source = ShoppingListItemSource.ProductPhoto,
             DetectionConfidence = recognition.Confidence
@@ -155,8 +163,21 @@ public sealed partial class ShoppingListService(
         {
             throw new ConflictException("Apenas produtos ativos podem ser alterados.");
         }
-        item.ProductName = RequiredText(request.ProductName, "O nome do produto é obrigatório.");
-        item.NormalizedProductName = Normalize(item.ProductName);
+        if (request.ProductTypeId.HasValue)
+        {
+            var productType = await financeRepository.GetProductTypeAsync(
+                householdId, request.ProductTypeId.Value, true, cancellationToken)
+                ?? throw new ValidationException("O tipo de produto não pertence ao agregado ou está inativo.");
+            item.ProductTypeId = productType.Id;
+            item.ProductTypeName = productType.Name;
+            item.NormalizedProductTypeName = productType.NormalizedName;
+        }
+        else if (!string.IsNullOrWhiteSpace(request.ProductTypeName))
+        {
+            item.ProductTypeId = null;
+            item.ProductTypeName = request.ProductTypeName.Trim();
+            item.NormalizedProductTypeName = Normalize(item.ProductTypeName);
+        }
         item.Brand = EmptyToNull(request.Brand);
         item.Quantity = request.Quantity;
         item.Unit = EmptyToNull(request.Unit);
@@ -193,7 +214,7 @@ public sealed partial class ShoppingListService(
         foreach (var item in items)
         {
             var best = expense.Lines
-                .Select(line => new { Line = line, Confidence = Similarity(item.NormalizedProductName, Normalize(line.Description)) })
+                .Select(line => new { Line = line, Confidence = Similarity(item.NormalizedProductTypeName, Normalize(line.Description)) })
                 .OrderByDescending(x => x.Confidence)
                 .FirstOrDefault();
             if (best is null || best.Confidence < 0.72m || best.Line.Amount <= 0) continue;
@@ -328,19 +349,7 @@ public sealed partial class ShoppingListService(
         return union == 0 ? 0 : Math.Round((decimal)intersection / union, 4);
     }
 
-    internal static string Normalize(string value)
-    {
-        var decomposed = value.Trim().ToUpperInvariant().Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        foreach (var character in decomposed)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
-            {
-                builder.Append(char.IsLetterOrDigit(character) ? character : ' ');
-            }
-        }
-        return WhitespaceRegex().Replace(builder.ToString(), " ").Trim();
-    }
+    internal static string Normalize(string value) => ProductTypeNameNormalizer.Normalize(value);
 
     private static void ValidateQuantity(decimal? quantity)
     {
@@ -370,10 +379,10 @@ public sealed partial class ShoppingListService(
         list.Status,
         list.CreatedAtUtc,
         list.Items.Count(x => x.Status == ShoppingListItemStatus.Active),
-        list.Items.OrderBy(x => x.Status).ThenBy(x => x.ProductName).Select(Map).ToArray());
+        list.Items.OrderBy(x => x.Status).ThenBy(x => x.ProductTypeName).Select(Map).ToArray());
 
     private static ShoppingListItemResponse Map(ShoppingListItem item) => new(
-        item.Id, item.ProductName, item.Brand, item.Variant, item.Quantity, item.Unit, item.ExpectedPrice, item.Notes,
+        item.Id, item.ProductTypeId, item.ProductTypeName, item.Brand, item.Variant, item.Quantity, item.Unit, item.ExpectedPrice, item.Notes,
         item.Source, item.DetectionConfidence, item.Status, item.CreatedAtUtc, item.CompletedAtUtc);
 
     private static ShoppingListExpenseMatchResponse Map(ShoppingListExpenseMatch match) => new(
@@ -381,7 +390,7 @@ public sealed partial class ShoppingListService(
         match.ShoppingListItem.ShoppingListId,
         match.ShoppingListItem.ShoppingList.Name,
         match.ShoppingListItemId,
-        match.ShoppingListItem.ProductName,
+        match.ShoppingListItem.ProductTypeName,
         match.ExpenseId,
         match.ExpenseLineId,
         match.ExpenseLineDescription,
@@ -394,6 +403,4 @@ public sealed partial class ShoppingListService(
         match.CreatedAtUtc,
         match.ReviewedAtUtc);
 
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex WhitespaceRegex();
 }

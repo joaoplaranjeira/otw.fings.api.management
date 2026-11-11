@@ -65,6 +65,7 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
         IReadOnlyList<Household> newHouseholds,
         IReadOnlyList<HouseholdMember> memberships,
         IReadOnlyList<Category> categories,
+        IReadOnlyList<ProductType> productTypes,
         HouseholdInvitation? invitation,
         DateTimeOffset? invitationAcceptedAt,
         CancellationToken cancellationToken)
@@ -82,6 +83,7 @@ public sealed class AuthRepository(FingsDbContext dbContext) : IAuthRepository
         }
         dbContext.Households.AddRange(newHouseholds);
         dbContext.Categories.AddRange(categories);
+        dbContext.ProductTypes.AddRange(productTypes);
 
         foreach (var membership in memberships)
         {

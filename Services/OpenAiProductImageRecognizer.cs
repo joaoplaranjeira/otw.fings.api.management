@@ -15,7 +15,8 @@ public sealed class OpenAiProductImageRecognizer(
     private const string Instructions = """
         Analisa a fotografia de um produto destinado a uma lista de compras.
         Identifica apenas o produto principal visível e usa texto legível da embalagem quando exista.
-        productName deve ser curto, claro e adequado para uma lista de compras em português de Portugal.
+        productTypeName deve indicar o tipo genérico do produto em português de Portugal, por exemplo
+        "Arroz", "Água", "Massa" ou "Champô", sem incluir marca, variante ou tamanho.
         Mantém brand e variant separados do nome genérico. Se não forem visíveis ou seguros, devolve null.
         suggestedQuantity e suggestedUnit representam a quantidade da embalagem apenas quando estiver explicitamente visível.
         confidence mede a certeza de que o produto foi corretamente identificado, entre 0 e 1.
@@ -26,14 +27,14 @@ public sealed class OpenAiProductImageRecognizer(
         {
           "type": "object",
           "properties": {
-            "productName": { "type": "string" },
+            "productTypeName": { "type": "string" },
             "brand": { "type": ["string", "null"] },
             "variant": { "type": ["string", "null"] },
             "suggestedQuantity": { "type": ["number", "null"] },
             "suggestedUnit": { "type": ["string", "null"] },
             "confidence": { "type": "number" }
           },
-          "required": ["productName", "brand", "variant", "suggestedQuantity", "suggestedUnit", "confidence"],
+          "required": ["productTypeName", "brand", "variant", "suggestedQuantity", "suggestedUnit", "confidence"],
           "additionalProperties": false
         }
         """;
@@ -88,7 +89,7 @@ public sealed class OpenAiProductImageRecognizer(
                 completion.Content[0].Text,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new IntegrationUnavailableException("A OpenAI devolveu uma identificação vazia.");
-            if (string.IsNullOrWhiteSpace(recognition.ProductName))
+            if (string.IsNullOrWhiteSpace(recognition.ProductTypeName))
             {
                 throw new IntegrationUnavailableException("Não foi possível identificar um produto na fotografia.");
             }

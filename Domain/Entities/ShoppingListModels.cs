@@ -13,9 +13,10 @@ public sealed class ShoppingList : Entity
 public sealed class ShoppingListItem : Entity
 {
     public Guid ShoppingListId { get; set; }
+    public Guid? ProductTypeId { get; set; }
     public long AddedByUserId { get; set; }
-    public string ProductName { get; set; } = string.Empty;
-    public string NormalizedProductName { get; set; } = string.Empty;
+    public string ProductTypeName { get; set; } = string.Empty;
+    public string NormalizedProductTypeName { get; set; } = string.Empty;
     public string? Brand { get; set; }
     public string? Variant { get; set; }
     public decimal? Quantity { get; set; }
@@ -28,6 +29,7 @@ public sealed class ShoppingListItem : Entity
     public long? CompletedByUserId { get; set; }
     public DateTimeOffset? CompletedAtUtc { get; set; }
     public ShoppingList ShoppingList { get; set; } = null!;
+    public ProductType? ProductType { get; set; }
     public ICollection<ShoppingListExpenseMatch> ExpenseMatches { get; set; } = [];
 }
 

@@ -45,6 +45,17 @@ public sealed class FinanceServiceTests
         var housing = Assert.Single(categories, x => x.Name == "Habitação");
         Assert.Contains(housing.Subcategories, x => x.Name == "Limpeza");
 
+        var productTypes = await db.ProductTypes
+            .Include(x => x.Category)
+            .Include(x => x.Subcategory)
+            .Where(x => x.HouseholdId == result.Id)
+            .ToListAsync();
+        Assert.Equal(17, productTypes.Count);
+        Assert.Contains(productTypes, x =>
+            x.Name == "Leite" &&
+            x.Category.Name == "Alimentação" &&
+            x.Subcategory!.Name == "Supermercado");
+
         var membership = await db.HouseholdMembers.SingleAsync(x => x.HouseholdId == result.Id);
         Assert.Equal(1, membership.UserId);
         Assert.Equal(HouseholdRole.Owner, membership.Role);
@@ -817,6 +828,35 @@ public sealed class FinanceServiceTests
 
         var subcategory = Assert.Single(category.Subcategories);
         Assert.Equal("Não aplicável", subcategory.Name);
+    }
+
+    [Fact]
+    public async Task ProductTypes_CanBeCreatedListedAndUpdated()
+    {
+        await using var db = CreateDbContext();
+        var (household, category) = await SeedAsync(db);
+        var service = new FinanceService(new FinanceRepository(db));
+        var subcategory = await service.CreateSubcategoryAsync(
+            household.Id, category.Id, 1, new("Supermercado"), CancellationToken.None);
+
+        var created = await service.CreateProductTypeAsync(
+            household.Id,
+            1,
+            new(category.Id, subcategory.Id, "Leite"),
+            CancellationToken.None);
+        var updated = await service.UpdateProductTypeAsync(
+            household.Id,
+            created.Id,
+            1,
+            new(category.Id, subcategory.Id, "Bebida de aveia", true),
+            CancellationToken.None);
+        var productTypes = await service.GetProductTypesAsync(
+            household.Id, 1, false, CancellationToken.None);
+
+        Assert.Single(productTypes);
+        Assert.Equal("Bebida de aveia", updated.Name);
+        Assert.Equal(category.Id, updated.CategoryId);
+        Assert.Equal(subcategory.Id, updated.SubcategoryId);
     }
 
     [Fact]
