@@ -23,10 +23,12 @@ public sealed class OpenAiSettings
     public string ApiKey { get; init; } = string.Empty;
     public string ExtractionModel { get; init; } = "gpt-4o";
     public string Model { get; init; } = "gpt-4o-mini";
+    public string ProductRecognitionModel { get; init; } = "gpt-4o-mini";
     public bool VerifyReceiptValues { get; init; }
     [Range(1, 100)]
     public int MinimumReceiptImageQuality { get; init; } = 80;
     public int MaximumReceiptBytes { get; init; } = 10 * 1024 * 1024;
+    public int MaximumProductImageBytes { get; init; } = 10 * 1024 * 1024;
 }
 
 public sealed class OtpSettings

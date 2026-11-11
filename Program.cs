@@ -96,6 +96,7 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IFinanceRepository, FinanceRepository>();
+builder.Services.AddScoped<IShoppingListRepository, ShoppingListRepository>();
 builder.Services.AddScoped<IHouseholdInvitationRepository, HouseholdInvitationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFinanceService, FinanceService>();
@@ -103,6 +104,10 @@ builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<IHouseholdInvitationService, HouseholdInvitationService>();
 builder.Services.AddScoped<IReceiptParser, OpenAiReceiptParser>();
 builder.Services.AddScoped<IReceiptParseReviewService, ReceiptParseReviewService>();
+builder.Services.AddScoped<IProductImageRecognizer, OpenAiProductImageRecognizer>();
+builder.Services.AddScoped<ShoppingListService>();
+builder.Services.AddScoped<IShoppingListService>(services => services.GetRequiredService<ShoppingListService>());
+builder.Services.AddScoped<IShoppingListExpenseMatcher>(services => services.GetRequiredService<ShoppingListService>());
 builder.Services.AddScoped<IRecurringExpenseMaterializer, RecurringExpenseMaterializer>();
 builder.Services.AddScoped<ICurrentUserContext, CurrentUserContext>();
 builder.Services.AddSingleton<ITokenService, TokenService>();

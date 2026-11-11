@@ -7,7 +7,8 @@ namespace otw.fings.api.management.Services;
 public sealed class FinanceService(
     IFinanceRepository repository,
     IRecurringExpenseMaterializer? materializer = null,
-    TimeProvider? timeProvider = null) : IFinanceService
+    TimeProvider? timeProvider = null,
+    IShoppingListExpenseMatcher? shoppingListExpenseMatcher = null) : IFinanceService
 {
     private readonly IRecurringExpenseMaterializer recurringExpenseMaterializer =
         materializer ?? new RecurringExpenseMaterializer(repository);
@@ -535,6 +536,10 @@ public sealed class FinanceService(
             });
         }
         await repository.AddExpenseAsync(expense, cancellationToken);
+        if (shoppingListExpenseMatcher is not null)
+        {
+            await shoppingListExpenseMatcher.DetectMatchesAsync(expense, cancellationToken);
+        }
         expense.Category = category;
         expense.Subcategory = subcategory;
         return Map(expense);

@@ -29,6 +29,9 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
     public DbSet<ExpenseLine> ExpenseLines => Set<ExpenseLine>();
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<ReceiptParseRecord> ReceiptParseRecords => Set<ReceiptParseRecord>();
+    public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
+    public DbSet<ShoppingListItem> ShoppingListItems => Set<ShoppingListItem>();
+    public DbSet<ShoppingListExpenseMatch> ShoppingListExpenseMatches => Set<ShoppingListExpenseMatch>();
     public DbSet<NotificationEventOutbox> NotificationEventOutbox => Set<NotificationEventOutbox>();
     public DbSet<NotificationRule> NotificationRules => Set<NotificationRule>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
@@ -220,6 +223,57 @@ public sealed class FingsDbContext(DbContextOptions<FingsDbContext> options) : D
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.RequestedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.ValidatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShoppingList>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasIndex(x => new { x.HouseholdId, x.Status });
+            entity.HasOne(x => x.Household).WithMany().HasForeignKey(x => x.HouseholdId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShoppingListItem>(entity =>
+        {
+            entity.Property(x => x.ProductName).HasMaxLength(250);
+            entity.Property(x => x.NormalizedProductName).HasMaxLength(250);
+            entity.Property(x => x.Brand).HasMaxLength(150);
+            entity.Property(x => x.Variant).HasMaxLength(150);
+            entity.Property(x => x.Quantity).HasPrecision(18, 3);
+            entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.Property(x => x.ExpectedPrice).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.Property(x => x.DetectionConfidence).HasPrecision(5, 4);
+            entity.HasIndex(x => new { x.ShoppingListId, x.Status });
+            entity.HasIndex(x => x.NormalizedProductName);
+            entity.HasOne(x => x.ShoppingList).WithMany(x => x.Items)
+                .HasForeignKey(x => x.ShoppingListId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.AddedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.CompletedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShoppingListExpenseMatch>(entity =>
+        {
+            entity.Property(x => x.ExpenseLineDescription).HasMaxLength(500);
+            entity.Property(x => x.RequestedQuantityAtDetection).HasPrecision(18, 3);
+            entity.Property(x => x.DetectedPurchasedQuantity).HasPrecision(18, 3);
+            entity.Property(x => x.ApprovedPurchasedQuantity).HasPrecision(18, 3);
+            entity.Property(x => x.RemainingQuantity).HasPrecision(18, 3);
+            entity.Property(x => x.Confidence).HasPrecision(5, 4);
+            entity.HasIndex(x => new { x.ShoppingListItemId, x.ExpenseLineId }).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.CreatedAtUtc });
+            entity.HasOne(x => x.ShoppingListItem).WithMany(x => x.ExpenseMatches)
+                .HasForeignKey(x => x.ShoppingListItemId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Expense).WithMany().HasForeignKey(x => x.ExpenseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ExpenseLine).WithMany().HasForeignKey(x => x.ExpenseLineId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.ReviewedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

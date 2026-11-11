@@ -1162,6 +1162,193 @@ namespace otw.fings.api.management.Migrations
                     b.ToTable("RecurringExpenses");
                 });
 
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingList", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("HouseholdId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("HouseholdId", "Status");
+
+                    b.ToTable("ShoppingLists");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingListExpenseMatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<decimal?>("ApprovedPurchasedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("Confidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<decimal?>("DetectedPurchasedQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("ExpenseId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("ExpenseLineDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<Guid>("ExpenseLineId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<decimal?>("RemainingQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal?>("RequestedQuantityAtDetection")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<long?>("ReviewedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ShoppingListItemId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseId");
+
+                    b.HasIndex("ExpenseLineId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("ShoppingListItemId", "ExpenseLineId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.ToTable("ShoppingListExpenseMatches");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingListItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<long>("AddedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<long?>("CompletedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<decimal?>("DetectionConfidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<decimal?>("ExpectedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("NormalizedProductName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("ShoppingListId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("Variant")
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("CompletedByUserId");
+
+                    b.HasIndex("NormalizedProductName");
+
+                    b.HasIndex("ShoppingListId", "Status");
+
+                    b.ToTable("ShoppingListItems");
+                });
+
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.Subcategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1510,6 +1697,77 @@ namespace otw.fings.api.management.Migrations
                     b.Navigation("Subcategory");
                 });
 
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingList", b =>
+                {
+                    b.HasOne("otw.fings.api.management.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.Household", "Household")
+                        .WithMany()
+                        .HasForeignKey("HouseholdId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Household");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingListExpenseMatch", b =>
+                {
+                    b.HasOne("otw.fings.api.management.Domain.Entities.Expense", "Expense")
+                        .WithMany()
+                        .HasForeignKey("ExpenseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.ExpenseLine", "ExpenseLine")
+                        .WithMany()
+                        .HasForeignKey("ExpenseLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.ShoppingListItem", "ShoppingListItem")
+                        .WithMany("ExpenseMatches")
+                        .HasForeignKey("ShoppingListItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Expense");
+
+                    b.Navigation("ExpenseLine");
+
+                    b.Navigation("ShoppingListItem");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingListItem", b =>
+                {
+                    b.HasOne("otw.fings.api.management.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CompletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("otw.fings.api.management.Domain.Entities.ShoppingList", "ShoppingList")
+                        .WithMany("Items")
+                        .HasForeignKey("ShoppingListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ShoppingList");
+                });
+
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.Subcategory", b =>
                 {
                     b.HasOne("otw.fings.api.management.Domain.Entities.Category", "Category")
@@ -1564,6 +1822,16 @@ namespace otw.fings.api.management.Migrations
             modelBuilder.Entity("otw.fings.api.management.Domain.Entities.RecurringExpense", b =>
                 {
                     b.Navigation("Expenses");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingList", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("otw.fings.api.management.Domain.Entities.ShoppingListItem", b =>
+                {
+                    b.Navigation("ExpenseMatches");
                 });
 #pragma warning restore 612, 618
         }

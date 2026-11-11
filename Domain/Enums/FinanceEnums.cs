@@ -85,3 +85,29 @@ public enum ReceiptParseValidationStatus
     Valid = 2,
     Invalid = 3
 }
+
+public enum ShoppingListStatus
+{
+    Active = 1,
+    Archived = 2
+}
+
+public enum ShoppingListItemStatus
+{
+    Active = 1,
+    Purchased = 2,
+    Removed = 3
+}
+
+public enum ShoppingListItemSource
+{
+    Manual = 1,
+    ProductPhoto = 2
+}
+
+public enum ShoppingListMatchStatus
+{
+    Pending = 1,
+    Approved = 2,
+    Rejected = 3
+}
