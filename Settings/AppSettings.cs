@@ -28,6 +28,8 @@ public sealed class OpenAiSettings
     [Range(1, 100)]
     public int MinimumReceiptImageQuality { get; init; } = 80;
     public int MaximumReceiptBytes { get; init; } = 10 * 1024 * 1024;
+    [Range(1, 20)]
+    public int MaximumReceiptPdfPages { get; init; } = 10;
     public int MaximumProductImageBytes { get; init; } = 10 * 1024 * 1024;
 }
 

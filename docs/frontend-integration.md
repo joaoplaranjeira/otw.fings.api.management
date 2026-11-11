@@ -590,13 +590,13 @@ const response = await fetch(
 
 Não definir manualmente `Content-Type`; o browser acrescenta o boundary correto.
 
-São aceites JPEG, PNG e WebP até 10 MiB. A API valida o MIME e a assinatura binária. A imagem e o resultado não são guardados.
+São aceites JPEG, PNG, WebP e PDF até 10 MiB. A API valida o MIME e a assinatura binária. Por omissão, um PDF pode conter no máximo 10 páginas; este limite pode ser configurado com `OpenAI__MaximumReceiptPdfPages`. PDFs protegidos por palavra-passe, corrompidos ou com páginas excessivamente grandes são rejeitados com `422`. O ficheiro e o resultado não são guardados.
 
 Existe uma segunda leitura visual experimental, mas está desativada por omissão porque acrescenta latência e custo sem benefício consistente nos talões reais testados. Pode ser ativada pontualmente com `OpenAI__VerifyReceiptValues=true`.
 
-Antes dessa chamada, a API recorta localmente o papel e divide talões compridos em segmentos sobrepostos. Todos os segmentos são enviados em conjunto numa única extração, para manter a latência controlada e tornar a coluna de valores mais legível. Quando o papel não é detetado com segurança, a imagem original é usada sem alterações.
+Antes dessa chamada, a API recorta localmente o papel e divide talões compridos em segmentos sobrepostos. Nos PDFs, renderiza as páginas pela ordem original como imagens JPEG e aplica-lhes o mesmo pré-processamento. Todas as imagens são enviadas em conjunto numa única extração, para manter a latência controlada e tornar a coluna de valores mais legível. Quando o papel não é detetado com segurança, a imagem ou página original é usada sem alterações.
 
-A qualidade é avaliada localmente antes de qualquer chamada à OpenAI, através da resolução útil do talão, nitidez, exposição e capacidade de separar o papel do fundo. O limiar por omissão é `80/100` e pode ser configurado com `OpenAI__MinimumReceiptImageQuality`.
+A qualidade das fotografias é avaliada localmente antes de qualquer chamada à OpenAI, através da resolução útil do talão, nitidez, exposição e capacidade de separar o papel do fundo. O limiar por omissão é `80/100` e pode ser configurado com `OpenAI__MinimumReceiptImageQuality`. Esta verificação fotográfica não é aplicada a PDFs renderizados com sucesso.
 
 Quando a qualidade fica abaixo do limiar e `acceptLowQuality` é `false`, a API não executa o parse e devolve `422`:
 

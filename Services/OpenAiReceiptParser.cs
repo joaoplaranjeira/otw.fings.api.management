@@ -15,8 +15,6 @@ public sealed class OpenAiReceiptParser(
     IOptions<OpenAiSettings> settings,
     ILogger<OpenAiReceiptParser> logger) : IReceiptParser
 {
-    private static readonly string[] AllowedContentTypes = ["image/jpeg", "image/png", "image/webp"];
-
     internal const string ExtractionInstructions = """
         És um especialista em leitura de talões de compras em Portugal.
         Extrai apenas a informação factual visível na imagem, sem classificar os artigos e sem inventar texto ilegível.
@@ -184,7 +182,7 @@ public sealed class OpenAiReceiptParser(
     public async Task<ReceiptParseResponse> ParseAsync(
         Guid householdId,
         long userId,
-        Stream image,
+        Stream file,
         string contentType,
         long length,
         bool acceptLowQuality,
@@ -202,24 +200,28 @@ public sealed class OpenAiReceiptParser(
         }
         if (length <= 0 || length > configuration.MaximumReceiptBytes)
         {
-            throw new ValidationException($"A imagem deve ter entre 1 byte e {configuration.MaximumReceiptBytes} bytes.");
+            throw new ValidationException($"O ficheiro deve ter entre 1 byte e {configuration.MaximumReceiptBytes} bytes.");
         }
-        if (!AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+        if (!ReceiptDocumentPreprocessor.IsSupportedContentType(contentType))
         {
-            throw new ValidationException("Formato inválido. São aceites imagens JPEG, PNG e WebP.");
+            throw new ValidationException("Formato inválido. São aceites imagens JPEG, PNG e WebP, ou documentos PDF.");
         }
 
         await using var memory = new MemoryStream((int)length);
-        await image.CopyToAsync(memory, cancellationToken);
+        await file.CopyToAsync(memory, cancellationToken);
         var bytes = memory.ToArray();
-        ValidateSignature(bytes, contentType);
-        var preparedImages = ReceiptImagePreprocessor.Prepare(bytes);
-        var preparedContentType = preparedImages.WasCropped ? "image/jpeg" : contentType;
+        var preparedDocument = ReceiptDocumentPreprocessor.Prepare(
+            bytes,
+            contentType,
+            configuration.MaximumReceiptPdfPages);
+        var preparedImages = preparedDocument.ImagePreparation;
+        var preparedContentType = preparedDocument.ContentType;
         logger.LogInformation(
-            "Receipt image preparation: cropped={WasCropped}, bounds={Bounds}, segments={SegmentCount}, quality={QualityScore}.",
+            "Receipt document preparation: pdf={IsPdf}, cropped={WasCropped}, bounds={Bounds}, images={ImageCount}, quality={QualityScore}.",
+            preparedDocument.IsPdf,
             preparedImages.WasCropped,
             preparedImages.Bounds,
-            preparedImages.Images.Count,
+            preparedDocument.Images.Count,
             preparedImages.Quality.Score);
         var imageQuality = MapImageQuality(
             preparedImages.Quality,
@@ -238,13 +240,19 @@ public sealed class OpenAiReceiptParser(
         ChatClient extractionClient = new(extractionModel, configuration.ApiKey);
         ChatClient classificationClient = new(configuration.Model, configuration.ApiKey);
 
-        var parsed = await ExtractAsync(extractionClient, preparedImages.Images, preparedContentType, cancellationToken);
+        var parsed = await ExtractAsync(
+            extractionClient,
+            preparedDocument.Images,
+            preparedContentType,
+            preparedDocument.IsPdf,
+            cancellationToken);
         if (configuration.VerifyReceiptValues && parsed.Lines.Count > 0)
         {
             var verifiedValues = await VerifyValuesAsync(
                 extractionClient,
-                preparedImages.Images,
+                preparedDocument.Images,
                 preparedContentType,
+                preparedDocument.IsPdf,
                 parsed,
                 cancellationToken);
             if (verifiedValues is not null)
@@ -342,6 +350,7 @@ public sealed class OpenAiReceiptParser(
         ChatClient client,
         IReadOnlyList<byte[]> images,
         string contentType,
+        bool isPdf,
         CancellationToken cancellationToken)
     {
         SystemChatMessage instructions = new(ExtractionInstructions);
@@ -349,7 +358,9 @@ public sealed class OpenAiReceiptParser(
         {
             ChatMessageContentPart.CreateTextPart(images.Count == 1
                 ? "Extrai os dados deste talão."
-                : "As imagens são recortes sobrepostos do mesmo talão, ordenados de cima para baixo. Extrai cada parcela uma única vez e usa as zonas repetidas apenas para confirmar a leitura.")
+                : isPdf
+                    ? "As imagens são páginas do mesmo documento PDF, ordenadas da primeira para a última. Extrai cada parcela uma única vez."
+                    : "As imagens são recortes sobrepostos do mesmo talão, ordenados de cima para baixo. Extrai cada parcela uma única vez e usa as zonas repetidas apenas para confirmar a leitura.")
         };
         content.AddRange(images.Select(image =>
             ChatMessageContentPart.CreateImagePart(BinaryData.FromBytes(image), contentType, ChatImageDetailLevel.High)));
@@ -389,6 +400,7 @@ public sealed class OpenAiReceiptParser(
         ChatClient client,
         IReadOnlyList<byte[]> images,
         string contentType,
+        bool isPdf,
         ParsedReceipt receipt,
         CancellationToken cancellationToken)
     {
@@ -408,7 +420,9 @@ public sealed class OpenAiReceiptParser(
         var content = new List<ChatMessageContentPart>
         {
             ChatMessageContentPart.CreateTextPart(
-                "Revê os valores desta extração contra os recortes do talão, ordenados de cima para baixo:\n" +
+                (isPdf
+                    ? "Revê os valores desta extração contra as páginas do documento PDF, ordenadas da primeira para a última:\n"
+                    : "Revê os valores desta extração contra os recortes do talão, ordenados de cima para baixo:\n") +
                 JsonSerializer.Serialize(previousExtraction))
         };
         content.AddRange(images.Select(image =>
@@ -551,18 +565,6 @@ public sealed class OpenAiReceiptParser(
         classificationOption?.Subcategory?.Id,
         classificationOption?.Subcategory?.Name,
         Math.Clamp(confidence, 0, 1));
-
-    private static void ValidateSignature(byte[] bytes, string contentType)
-    {
-        var valid = contentType.ToLowerInvariant() switch
-        {
-            "image/jpeg" => bytes.Length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff,
-            "image/png" => bytes.Length >= 8 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
-            "image/webp" => bytes.Length >= 12 && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8),
-            _ => false
-        };
-        if (!valid) throw new ValidationException("O conteúdo do ficheiro não corresponde ao formato declarado.");
-    }
 
     internal static IReadOnlyList<ClassificationOption> CreateClassificationOptions(IReadOnlyList<Category> categories)
     {

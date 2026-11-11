@@ -56,7 +56,12 @@ public sealed class ReceiptImagePreprocessorTests
         using (var canvas = new SKCanvas(blurred))
         using (var paint = new SKPaint { ImageFilter = SKImageFilter.CreateBlur(7, 7) })
         {
-            canvas.DrawBitmap(sharp, 0, 0, paint);
+            canvas.DrawBitmap(
+                sharp,
+                0,
+                0,
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None),
+                paint);
         }
 
         var sharpResult = ReceiptImagePreprocessor.Prepare(Encode(sharp));

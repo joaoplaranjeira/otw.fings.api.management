@@ -37,7 +37,7 @@ public interface IFinanceService
 
 public interface IReceiptParser
 {
-    Task<ReceiptParseResponse> ParseAsync(Guid householdId, long userId, Stream image, string contentType, long length, bool acceptLowQuality, CancellationToken cancellationToken);
+    Task<ReceiptParseResponse> ParseAsync(Guid householdId, long userId, Stream file, string contentType, long length, bool acceptLowQuality, CancellationToken cancellationToken);
 }
 
 public interface IInsightsService

@@ -153,7 +153,11 @@ internal static class ReceiptImagePreprocessor
     {
         var target = new SKBitmap(bounds.Width, bounds.Height, source.ColorType, source.AlphaType);
         using var canvas = new SKCanvas(target);
-        canvas.DrawBitmap(source, bounds, new SKRect(0, 0, target.Width, target.Height));
+        canvas.DrawBitmap(
+            source,
+            bounds,
+            new SKRect(0, 0, target.Width, target.Height),
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
         return target;
     }
 
